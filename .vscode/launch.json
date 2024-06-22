@@ -1,0 +1,37 @@
+// A launch configuration that compiles the extension and then opens it inside a new window
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch Client",
+      "type": "extensionHost",
+      "request": "launch",
+      "autoAttachChildProcesses": true,
+      "runtimeExecutable": "${execPath}",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceRoot}/packages/mlog-ls-vscode"
+      ],
+      "outFiles": [
+        "${workspaceRoot}/packages/*/dist/**/*.js",
+        "${workspaceRoot}/packages/*/dist/**/*.cjs"
+      ],
+      "preLaunchTask": "Build mlog-ls-vscode in watch mode"
+    },
+    {
+      "name": "Launch Web Client",
+      "type": "extensionHost",
+      "request": "launch",
+      "sourceMaps": true,
+      "debugWebWorkerHost": true,
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/mlog-ls-vscode",
+        "--extensionDevelopmentKind=web"
+      ],
+      "outFiles": [
+        "${workspaceRoot}/packages/*/dist/**/*.js",
+        "${workspaceRoot}/packages/*/dist/**/*.cjs"
+      ],
+      "preLaunchTask": "Build mlog-ls-vscode in watch mode"
+    }
+  ]
+}

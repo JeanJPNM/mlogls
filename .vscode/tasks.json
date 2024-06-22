@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Build mlog-ls in watch mode",
+      "isBackground": true,
+      "group": "build",
+      "type": "shell",
+      "command": "pnpm -C packages/mlog-ls dev",
+      "problemMatcher": {
+        "owner": "esbuild",
+        "pattern": {
+          "regexp": "_______"
+        },
+        "background": {
+          "beginsPattern": "building...",
+          "endsPattern": "\\[watch\\] build finished"
+        }
+      }
+    },
+    {
+      "label": "Build mlog-ls-vscode in watch mode",
+      "isBackground": true,
+      "type": "shell",
+      "command": "pnpm -C packages/mlog-ls-vscode dev",
+      "problemMatcher": {
+        "owner": "esbuild",
+        "pattern": {
+          "regexp": "_______"
+        },
+        "background": {
+          "beginsPattern": "building...",
+          "endsPattern": "\\[watch\\] build finished"
+        }
+      },
+      "dependsOn": ["Build mlog-ls in watch mode"]
+    }
+  ]
+}

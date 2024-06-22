@@ -1,0 +1,99 @@
+name: Mindustry Logic
+fileTypes:
+  - mlog
+scopeName: source.mlog
+patterns:
+  - include: "#comment"
+  - include: "#label"
+  - include: "#statement"
+  - include: "#semicolon"
+repository:
+  comment:
+    name: comment.line.number-sign.mlog
+    match: (#+).*$
+    captures:
+      1:
+        name: punctuation.definition.comment.mlog
+  identifier:
+    match: '[^\s#;]+'
+    name: variable.other.mlog
+  number:
+    patterns:
+      # the lookaheads and lookbehinds are to ensure that the number is not part of an identifier
+      - name: keyword.operator.arithmetic.mlog
+        match: "-"
+      - comment: Match hexadecimal numbers and color literals
+        name: constant.numeric.hex.mlog
+        match: (?<=\s|^)(0x|%)[a-fA-F0-9]+(?=\s|$|;)
+      - name: constant.numeric.binary.mlog
+        match: (?<=\s|^)(?i:(0b[01]+))(?=\s|$|;)
+      - name: constant.numeric.decimal.mlog
+        match: (?<=\s|^|-)\d+(\.\d+)?(?=\s|$|;)
+      - name: constant.numeric.decimal.mlog
+        match: (?<=\s|^|-)\.\d+(?=\s|$|;)
+      - name: constant.numeric.decimal.mlog
+        match: (?<=\s|^|-)\d+(\.\d+)?[Ee][+-]?\d+(?=\s|$|;)
+  semicolon:
+    match: ;(.*)$
+    captures:
+      0:
+        patterns:
+          - include: "#comment"
+          - include: "#label"
+          - include: "#statement"
+  statement:
+    match: \s*(\w+)(.*)$
+    captures:
+      1:
+        patterns:
+          - match: \b(?:(wait|jump|end|stop)|(\w+))\b
+            captures:
+              1:
+                name: keyword.control.mlog
+              2:
+                name: keyword.mlog
+      2:
+        patterns:
+          - include: "#comment"
+          - include: "#value"
+          - include: "#identifier"
+          - include: "#semicolon"
+  value:
+    patterns:
+      - name: constant.language.boolean.true.mlog
+        match: \btrue\b
+      - name: constant.language.boolean.false.mlog
+        match: \bfalse\b
+      - name: constant.language.null.mlog
+        match: \bnull\b
+      - include: "#number"
+      - include: "#string"
+
+  label:
+    match: \s*(\S+)(:)
+    captures:
+      1:
+        name: entity.name.function.mlog
+      2:
+        name: punctuation.separator.colon.mlog
+  string:
+    name: string.quoted.double.mlog
+    begin: '"'
+    beginCaptures:
+      0:
+        name: punctuation.definition.string.begin.mlog
+    end: "\"|\\n"
+    endCaptures:
+      0:
+        name: punctuation.definition.string.end.mlog
+    patterns:
+      - name: constant.character.escape.mlog
+        match: \\n
+      - match: (\{)(\d)(\})
+        captures:
+          1:
+            name: punctuation.section.embedded.begin.mlog
+          2:
+            name: punctuation.section.embedded.mlog
+          3:
+            name: punctuation.section.embedded.end.mlog

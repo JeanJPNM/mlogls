@@ -1,0 +1,57 @@
+{
+  "name": "mlog-ls",
+  "description": "A language server for the mindustry logic programming language",
+  "version": "0.0.1",
+  "author": "JeanJPNM",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16"
+  },
+  "main": "dist/server.cjs",
+  "module": "dist/server.js",
+  "types": "dist/server.d.ts",
+  "scripts": {
+    "build": "node build.js",
+    "build:types": "tsc --emitDeclarationOnly",
+    "dev": "node build.js --watch --dev"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs",
+      "node": "./dist/server.cjs",
+      "types": "./dist/server.d.ts"
+    },
+    "./node": {
+      "import": "./dist/nodeServerMain.js",
+      "require": "./dist/nodeServerMain.cjs",
+      "node": "./dist/nodeServerMain.cjs",
+      "types": "./dist/nodeServerMain.d.ts"
+    },
+    "./browser": {
+      "import": "./dist/browserServerMain.js",
+      "require": "./dist/browserServerMain.cjs",
+      "types": "./dist/browserServerMain.d.ts",
+      "node": "./dist/browserServerMain.cjs"
+    }
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JeanJPNM/mlog-ls.git",
+    "directory": "packages/mlog-ls"
+  },
+  "bugs": {
+    "url": "https://github.com/JeanJPNM/mlog-ls/issues"
+  },
+  "keywords": [
+    "lsp",
+    "language-server",
+    "mindustry",
+    "mindustry-logic"
+  ],
+  "dependencies": {
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.11"
+  },
+  "type": "module"
+}

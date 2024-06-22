@@ -1,0 +1,496 @@
+import {
+  ColorInformation,
+  CompletionItem,
+  CompletionItemKind,
+  CompletionList,
+  type Connection,
+  Diagnostic,
+  type InitializeResult,
+  Range,
+  TextDocumentSyncKind,
+  TextDocuments,
+  Position,
+  TextEdit,
+  Command,
+  CodeAction,
+  CodeActionKind,
+  TextDocumentIdentifier,
+} from "vscode-languageserver";
+import { MlogDocument } from "./document";
+import { TokenModifiers, TokenTypes } from "./protocol";
+import { TokenSemanticData, CompletionContext } from "./instructions";
+import { builtinGlobals, keywordConstants } from "./constants";
+import {
+  ParserDiagnostic,
+  TokenLine,
+  declaredVariables,
+  findLabels,
+  parseColor,
+} from "./parser/tokenize";
+import { formatCode } from "./formatter";
+import { JumpInstruction, getInstructionNames } from "./parser/nodes";
+import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
+
+export interface LanguageServerOptions {
+  connection: Connection;
+}
+
+enum Commands {
+  useJumpLabels = "mlog.useJumpLabels",
+  useJumpIndexes = "mlog.useJumpIndexes",
+}
+
+export function startServer(options: LanguageServerOptions) {
+  const { connection } = options;
+
+  const documents = new TextDocuments({
+    create(uri, languageId, version, content) {
+      return new MlogDocument(uri, languageId, version, content);
+    },
+    update(document, changes, version) {
+      document.update(changes, version);
+      return document;
+    },
+  });
+
+  const commands = {
+    convertToLabels(textDocument: TextDocumentIdentifier) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+
+      connection.workspace.applyEdit({
+        changes: {
+          [textDocument.uri]: convertToLabeledJumps(doc),
+        },
+      });
+    },
+    convertToIndexes(textDocument: TextDocumentIdentifier) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+
+      connection.workspace.applyEdit({
+        changes: {
+          [textDocument.uri]: convertToNumberedJumps(doc),
+        },
+      });
+    },
+  };
+
+  connection.onInitialize((params) => {
+    const result: InitializeResult = {
+      capabilities: {
+        textDocumentSync: TextDocumentSyncKind.Incremental,
+        completionProvider: {
+          resolveProvider: false,
+          completionItem: {
+            labelDetailsSupport: true,
+          },
+        },
+        colorProvider: true,
+        semanticTokensProvider: {
+          documentSelector: null,
+          full: true,
+          legend: {
+            tokenTypes: TokenTypes.keys,
+            tokenModifiers: TokenModifiers.keys,
+          },
+        },
+        signatureHelpProvider: {
+          triggerCharacters: [" "],
+        },
+        documentFormattingProvider: true,
+        codeActionProvider: true,
+        executeCommandProvider: {
+          commands: Object.values(Commands),
+        },
+      },
+    };
+
+    return result;
+  });
+
+  connection.languages.semanticTokens.on((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    const lines = doc?.lines;
+    const data: number[] = [];
+
+    if (!lines || lines.length === 0) return { data };
+
+    const tokens: TokenSemanticData[] = [];
+
+    for (const node of doc.nodes) {
+      node.provideTokenSemantics(tokens);
+    }
+
+    let previous = Position.create(0, 0);
+
+    for (const { token, type, modifiers } of tokens) {
+      const current = doc.positionAt(token.start);
+
+      const deltaLine = current.line - previous.line;
+      const deltaStart =
+        deltaLine === 0
+          ? current.character - previous.character
+          : current.character;
+      const length = token.end - token.start;
+      let tokenType = type ?? TokenTypes.variable;
+
+      let tokenModifiers = modifiers ?? 0;
+
+      if (token.isComment) {
+        tokenType = TokenTypes.comment;
+      } else if (token.isColorLiteral || token.isNumber) {
+        tokenType = TokenTypes.number;
+      } else if (token.isString) {
+        tokenType = TokenTypes.string;
+      } else if (!type && token.content.startsWith("@")) {
+        tokenModifiers = TokenModifiers.readonly;
+      } else if (token.isLabel) {
+        tokenType = TokenTypes.function;
+      }
+
+      data.push(deltaLine);
+      data.push(deltaStart);
+      data.push(length);
+      data.push(tokenType);
+      data.push(tokenModifiers);
+
+      previous = current;
+    }
+
+    return { data };
+  });
+
+  connection.onDocumentColor((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    const lines = doc.lines;
+    const colors: ColorInformation[] = [];
+
+    for (const line of lines) {
+      if (line.tokens[0].content === "packcolor" && line.tokens.length > 2) {
+        const red = Number(line.tokens[2].content);
+        const green = Number(line.tokens[3]?.content) || 0;
+        const blue = Number(line.tokens[4]?.content) || 0;
+        const alpha = Number(line.tokens[5]?.content) || 1;
+
+        colors.push({
+          color: { red, green, blue, alpha },
+          range: Range.create(
+            doc.positionAt(line.tokens[2].start),
+            doc.positionAt(line.tokens[5]?.end ?? line.end)
+          ),
+        });
+        continue;
+      }
+
+      for (const token of line.tokens) {
+        if (token.isColorLiteral) {
+          const color = parseColor(token.content.slice(1));
+
+          colors.push({
+            range: Range.create(
+              doc.positionAt(token.start),
+              doc.positionAt(token.end)
+            ),
+            color,
+          });
+          continue;
+        }
+      }
+    }
+
+    return colors;
+  });
+
+  connection.onColorPresentation((params) => {
+    const { color, range, textDocument } = params;
+
+    const doc = documents.get(textDocument.uri);
+    if (!doc) return [];
+
+    const line = getSelectedLine(doc, doc.offsetAt(range.start));
+    if (line?.tokens[0].content === "packcolor") {
+      const { red, green, blue, alpha } = color;
+      // three digits of precision is enough, since each "step" has a value of 0,255
+      const r = (value: number) => Math.round(value * 10 ** 3) / 10 ** 3;
+      return [
+        {
+          label: `${r(red)} ${r(green)} ${r(blue)} ${r(alpha)}`,
+        },
+      ];
+    }
+
+    const red = Math.round(color.red * 255);
+    const green = Math.round(color.green * 255);
+    const blue = Math.round(color.blue * 255);
+    const alpha = Math.round(color.alpha * 255);
+
+    const c = (n: number) => n.toString(16).padStart(2, "0");
+    const label =
+      alpha === 255
+        ? `%${c(red)}${c(green)}${c(blue)}`
+        : `%${c(red)}${c(green)}${c(blue)}${c(alpha)}`;
+
+    return [{ label }];
+  });
+
+  connection.onCompletion((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    const offset = doc.offsetAt(params.position);
+
+    // const line = getSelectedLine(doc, offset);
+    const node = getSelectedSyntaxNode(doc, offset);
+    const line = node?.line;
+
+    const selectedToken = line?.tokens.find(
+      (token) => token.start <= offset && token.end >= offset
+    );
+
+    const range = selectedToken
+      ? Range.create(
+          doc.positionAt(selectedToken.start),
+          doc.positionAt(selectedToken.end)
+        )
+      : Range.create(params.position, params.position);
+
+    // show completions for instructions if:
+    // - there are no token lines in the document (likely means the document is empty)
+    // - the cursor is contained within the first token of the selected token line
+    // - the cursor is outside the selected token line
+    if (!line || selectedToken === line.tokens[0] || line.end < offset) {
+      return {
+        items: getInstructionNames().map((code) => ({
+          label: code,
+          kind: CompletionItemKind.Keyword,
+        })),
+        itemDefaults: {
+          editRange: range,
+        },
+        isIncomplete: false,
+      } satisfies CompletionList;
+    }
+
+    const context: CompletionContext = {
+      getVariableCompletions() {
+        return [...builtinGlobals, ...declaredVariables(doc.lines)].map(
+          (variable): CompletionItem => ({
+            label: variable,
+            kind:
+              keywordConstants.indexOf(variable) === -1
+                ? CompletionItemKind.Variable
+                : CompletionItemKind.Keyword,
+            sortText: variable.startsWith("@")
+              ? `1${variable}`
+              : `0${variable}`,
+          })
+        );
+      },
+      getLabelCompletions() {
+        return [...findLabels(doc.lines)].map((label) => ({
+          label,
+          kind: CompletionItemKind.Property,
+        }));
+      },
+    };
+
+    const completionList = CompletionList.create(
+      node.provideCompletionItems(context, offset)
+    );
+
+    completionList.itemDefaults = {
+      editRange: range,
+    };
+    return completionList;
+  });
+
+  connection.onSignatureHelp((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return;
+
+    const offset = doc.offsetAt(params.position);
+
+    const node = getSelectedSyntaxNode(doc, offset);
+    // const line = getSelectedLine(doc, offset);
+    // if (!line) return;
+    if (!node) return;
+
+    return node.provideSignatureHelp(offset);
+
+    // const inst = getInstructionHandler(line.tokens[0].content);
+    // if (!inst) return;
+
+    // const data = inst.parse(line.tokens);
+
+    // return inst.provideSignatureHelp({
+    //   data,
+    //   offset,
+    //   tokens: line.tokens,
+    // });
+  });
+
+  connection.onDocumentFormatting((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return;
+    if (doc.lines.length === 0) return;
+    const { options } = params;
+
+    const formattedCode = formatCode({
+      doc,
+      insertSpaces: options.insertSpaces,
+      tabSize: options.tabSize,
+      insertFinalNewline: options.insertFinalNewline,
+    });
+
+    return [
+      TextEdit.replace(Range.create(0, 0, doc.lineCount, 0), formattedCode),
+    ];
+  });
+
+  connection.onCodeAction((params) => {
+    const { range, textDocument } = params;
+    const doc = documents.get(textDocument.uri);
+    if (!doc) return;
+
+    const start = doc.offsetAt(range.start);
+    const end = doc.offsetAt(range.end);
+
+    let hasIndexJump = false;
+    let hasLabelJump = false;
+
+    const actions: (CodeAction | Command)[] = [];
+
+    for (const node of getPartiallySelectedSyntaxNodes(doc, start, end)) {
+      if (node instanceof JumpInstruction) {
+        const { destination } = node.data;
+        switch (destination?.type) {
+          case "identifier":
+            hasLabelJump = true;
+            break;
+          case "number":
+            hasIndexJump = true;
+            break;
+        }
+      }
+    }
+
+    if (hasLabelJump) {
+      actions.push({
+        title: "Use indexes for all jumps",
+        kind: CodeActionKind.RefactorRewrite,
+        command: {
+          command: Commands.useJumpIndexes,
+          title: "Use indexes for all jumps",
+          arguments: [textDocument],
+        },
+      });
+    }
+
+    if (hasIndexJump) {
+      actions.push({
+        title: "Use labels for all jumps",
+        kind: CodeActionKind.RefactorRewrite,
+        command: {
+          command: Commands.useJumpLabels,
+          title: "Use labels for all jumps",
+          arguments: [textDocument],
+        },
+      });
+    }
+
+    return actions;
+  });
+
+  connection.onExecuteCommand((params) => {
+    const { command } = params;
+
+    switch (command) {
+      case Commands.useJumpLabels: {
+        const [textDocument] = params.arguments ?? [];
+        if (!TextDocumentIdentifier.is(textDocument)) return;
+
+        commands.convertToLabels(textDocument);
+        break;
+      }
+
+      case Commands.useJumpIndexes: {
+        const [textDocument] = params.arguments ?? [];
+        if (!TextDocumentIdentifier.is(textDocument)) return;
+
+        commands.convertToIndexes(textDocument);
+        break;
+      }
+    }
+  });
+
+  documents.onDidChangeContent((change) => {
+    const doc = documents.get(change.document.uri);
+    if (!doc) return;
+
+    const parserDiagnostics: ParserDiagnostic[] = [...doc.parserDiagnostics];
+    for (const provider of doc.nodes) {
+      provider.provideDiagnostics(parserDiagnostics);
+    }
+
+    const diagnostics: Diagnostic[] = [];
+
+    for (const diagnostic of parserDiagnostics) {
+      diagnostics.push({
+        ...diagnostic,
+        range: Range.create(
+          doc.positionAt(diagnostic.start),
+          doc.positionAt(diagnostic.end)
+        ),
+        source: "mlog",
+      });
+    }
+
+    connection.sendDiagnostics({ uri: doc.uri, diagnostics });
+  });
+
+  documents.onDidClose((e) => {
+    const { document } = e;
+
+    // remove existing warnings and error messages
+    // since each file is standalone
+    connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
+  });
+
+  // Make the text document manager listen on the connection
+  // for open, change and close text document events
+  documents.listen(connection);
+
+  // Listen on the connection
+  connection.listen();
+}
+
+function getSelectedSyntaxNode(doc: MlogDocument, offset: number) {
+  return doc.nodes.find((node) => node.start <= offset && node.end >= offset);
+}
+
+/**
+ * Returns the last line whose first token has a start that is
+ * less than or equal to the offset
+ */
+function getSelectedLine(
+  doc: MlogDocument,
+  offset: number
+): TokenLine | undefined {
+  return getSelectedSyntaxNode(doc, offset)?.line;
+}
+
+function* getPartiallySelectedSyntaxNodes(
+  doc: MlogDocument,
+  start: number,
+  end: number
+) {
+  for (const node of doc.nodes) {
+    if (node.end <= start) continue;
+    if (node.start >= end) break;
+
+    yield node;
+  }
+}

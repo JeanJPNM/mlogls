@@ -1,0 +1,61 @@
+{
+  "name": "mlog-ls-vscode",
+  "private": true,
+  "author": "JeanJPNM",
+  "license": "MIT",
+  "version": "0.0.1",
+  "publisher": "JeanJPNM",
+  "categories": [
+    "Programming Languages"
+  ],
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "activationEvents": [
+    "onLanguage"
+  ],
+  "main": "./dist/nodeClient.js",
+  "browser": "./dist/browserClient.js",
+  "scripts": {
+    "vscode:prepublish": "pnpm -r run build",
+    "build": "node build.mjs",
+    "build:syntax": "js-yaml ./syntaxes/mlog.tmLanguage.yaml > ./syntaxes/mlog.tmLanguage.json",
+    "dev": "node build.mjs --watch --dev",
+    "dev:syntax": "nodemon "
+  },
+  "contributes": {
+    "languages": [
+      {
+        "id": "mlog",
+        "aliases": [
+          "Mindustry Logic",
+          "mlog"
+        ],
+        "extensions": [
+          ".mlog"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "mlog",
+        "scopeName": "source.mlog",
+        "path": "./syntaxes/mlog.tmLanguage.json"
+      }
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JeanJPNM/mlog-ls.git",
+    "directory": "packages/mlog-ls-vscode"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.75.0",
+    "js-yaml": "^4.1.0",
+    "mlog-ls": "workspace:^",
+    "nodemon": "^3.1.0",
+    "vscode-languageclient": "^9.0.1"
+  },
+  "type": "commonjs"
+}
