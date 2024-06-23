@@ -1,5 +1,10 @@
 // @ts-check
 import * as esbuild from "esbuild";
+import chokidar from "chokidar";
+import jsYaml from "js-yaml";
+import * as fs from "node:fs/promises";
+
+const syntaxFile = "syntaxes/mlog.tmLanguage.yaml";
 
 const watchMode = process.argv.includes("--watch");
 const isDev = process.argv.includes("--dev");
@@ -34,10 +39,37 @@ const contexts = await Promise.all([
 
 console.log("building...");
 if (watchMode) {
+  const watcher = chokidar.watch(syntaxFile, {
+    atomic: true,
+  });
+
+  watcher.on("change", buildLanguageSyntax).on("ready", buildLanguageSyntax);
+
   await Promise.all(contexts.map((context) => context.watch()));
 } else {
-  await Promise.all(contexts.map((context) => context.rebuild()));
+  await Promise.all([
+    ...contexts.map((context) => context.rebuild()),
+    buildLanguageSyntax(),
+  ]);
   await Promise.all(contexts.map((context) => context.dispose()));
 
   console.log("done");
+}
+
+async function buildLanguageSyntax() {
+  console.log("building language syntax...");
+  const yaml = await fs.readFile(syntaxFile, "utf-8");
+
+  try {
+    const json = jsYaml.load(yaml, {
+      filename: syntaxFile,
+      onWarning: console.warn,
+    });
+
+    const jsonPath = syntaxFile.replace(".yaml", ".json");
+
+    await fs.writeFile(jsonPath, JSON.stringify(json, null, 2));
+  } catch (e) {
+    console.error(e);
+  }
 }
