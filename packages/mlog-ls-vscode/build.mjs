@@ -57,7 +57,9 @@ if (watchMode) {
 }
 
 async function buildLanguageSyntax() {
-  console.log("building language syntax...");
+  if (watchMode) {
+    console.log(`[watch] build started (${syntaxFile})`);
+  }
   const yaml = await fs.readFile(syntaxFile, "utf-8");
 
   try {
@@ -69,6 +71,11 @@ async function buildLanguageSyntax() {
     const jsonPath = syntaxFile.replace(".yaml", ".json");
 
     await fs.writeFile(jsonPath, JSON.stringify(json, null, 2));
+    if (watchMode) {
+      console.log(`[watch] build finished ${syntaxFile} -> ${jsonPath}`);
+    } else {
+      console.log(`built ${syntaxFile} -> ${jsonPath}`);
+    }
   } catch (e) {
     console.error(e);
   }
