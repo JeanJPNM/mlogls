@@ -13,7 +13,12 @@ import {
   getTargetToken,
   validateRestrictedToken,
 } from "../instructions";
-import { ParserDiagnostic, TextToken, TokenLine } from "./tokenize";
+import {
+  ParserDiagnostic,
+  ParserPosition,
+  TextToken,
+  TokenLine,
+} from "./tokenize";
 import { SemanticTokenType, TokenModifiers, TokenTypes } from "../protocol";
 
 const restrictedTokenCompletionKind = CompletionItemKind.Keyword;
@@ -29,11 +34,11 @@ export abstract class SyntaxNode {
   isInstruction = true;
   constructor(public line: TokenLine) {}
 
-  get start(): number {
+  get start(): ParserPosition {
     return this.line.start;
   }
 
-  get end(): number {
+  get end(): ParserPosition {
     return this.line.end;
   }
 
@@ -53,14 +58,14 @@ export abstract class SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
     return context.getVariableCompletions();
   }
 
   provideTokenSemantics(tokens: TokenSemanticData[]): void {}
 
-  abstract provideSignatureHelp(offset: number): SignatureHelp;
+  abstract provideSignatureHelp(character: number): SignatureHelp;
 }
 
 export class CommentLine extends SyntaxNode {
@@ -77,7 +82,7 @@ export class CommentLine extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
     return [];
   }
@@ -107,7 +112,7 @@ export class NoopInstruction extends SyntaxNode {
     super(line);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       signatures: [
         {
@@ -168,9 +173,13 @@ export class ReadInstruction extends SyntaxNode {
     return new ReadInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       signatures: [getDescriptorSignature(ReadInstruction.descriptor, "read")],
     };
   }
@@ -197,8 +206,13 @@ export class WriteInstruction extends SyntaxNode {
 
     return new WriteInstruction(line, data);
   }
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       signatures: [
         getDescriptorSignature(WriteInstruction.descriptor, "write"),
       ],
@@ -335,8 +349,8 @@ export class DrawInstruction extends SyntaxNode {
     }
   }
 
-  provideCompletionItems(context: CompletionContext, offset: number) {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+  provideCompletionItems(context: CompletionContext, character: number) {
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return DrawInstruction.descriptor.getCompletionItems(
       this.data,
@@ -361,14 +375,14 @@ export class DrawInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { type } = this.data;
     const { descriptor } = DrawInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(type),
@@ -394,11 +408,11 @@ export class PrintInstruction extends SyntaxNode {
     return new PrintInstruction(line, value);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter: getActiveParameter(
         { value: this.value },
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: 0,
@@ -427,11 +441,11 @@ export class FormatInstruction extends SyntaxNode {
     return new FormatInstruction(line, value);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter: getActiveParameter(
         { value: this.value },
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: 0,
@@ -462,11 +476,11 @@ export class DrawFlushInstruction extends SyntaxNode {
     return new DrawFlushInstruction(line, target);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter: getActiveParameter(
         { target: this.target },
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: 0,
@@ -497,11 +511,11 @@ export class PrintFlushInstruction extends SyntaxNode {
     return new PrintFlushInstruction(line, target);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter: getActiveParameter(
         { target: this.target },
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: 0,
@@ -537,11 +551,11 @@ export class GetLinkInstruction extends SyntaxNode {
     return new GetLinkInstruction(line, result, index);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter: getActiveParameter(
         { result: this.result, index: this.index },
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: 0,
@@ -594,9 +608,9 @@ export class ControlInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     if (targetToken === this.data.typeToken) {
       return overloadCompletionItems(ControlInstruction.descriptor.overloads);
@@ -614,14 +628,14 @@ export class ControlInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { type } = this.data;
 
     return {
       activeParameter:
         ControlInstruction.descriptor.getActiveSignatureParameter(
           this.data,
-          offset,
+          character,
           this.line.tokens
         ),
       activeSignature: ControlInstruction.descriptor.getActiveSignature(type),
@@ -729,9 +743,9 @@ export class RadarInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return provideMemberCompletions(
       RadarInstruction.descriptor,
@@ -741,9 +755,13 @@ export class RadarInstruction extends SyntaxNode {
     );
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       signatures: [
         getDescriptorSignature(RadarInstruction.descriptor, "radar"),
       ],
@@ -773,9 +791,13 @@ export class SensorInstruction extends SyntaxNode {
     return new SensorInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       signatures: [
         getDescriptorSignature(SensorInstruction.descriptor, "sensor"),
       ],
@@ -804,9 +826,13 @@ export class SetInstruction extends SyntaxNode {
     return new SetInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       signatures: [getDescriptorSignature(SetInstruction.descriptor, "set")],
     };
   }
@@ -889,9 +915,9 @@ export class OpInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     if (targetToken === this.data.typeToken) {
       return Object.keys(OpInstruction.descriptor.overloads).map(
@@ -915,12 +941,12 @@ export class OpInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { type } = this.data;
     return {
       activeParameter: OpInstruction.descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: OpInstruction.descriptor.getActiveSignature(type),
@@ -949,11 +975,11 @@ export class WaitInstruction extends SyntaxNode {
     return new WaitInstruction(line, seconds);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter: getActiveParameter(
         { duration: this.seconds },
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: 0,
@@ -973,7 +999,7 @@ export class StopInstruction extends SyntaxNode {
     return new StopInstruction(line);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       signatures: [
         {
@@ -1027,9 +1053,9 @@ export class LookupInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     if (targetToken === this.data.typeToken) {
       return overloadCompletionItems(LookupInstruction.descriptor.overloads);
@@ -1048,11 +1074,11 @@ export class LookupInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter: LookupInstruction.descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: LookupInstruction.descriptor.getActiveSignature(
@@ -1122,9 +1148,13 @@ export class PackColorInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(PackColorInstruction.descriptor, "packcolor"),
@@ -1204,9 +1234,9 @@ export class JumpInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     if (targetToken === this.data.destination) {
       return context.getLabelCompletions();
@@ -1237,12 +1267,12 @@ export class JumpInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       signatures: JumpInstruction.descriptor.getSignatures("jump"),
       activeParameter: JumpInstruction.descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: JumpInstruction.descriptor.getActiveSignature(
@@ -1272,9 +1302,13 @@ export class UnitBindInstruction extends SyntaxNode {
     return new UnitBindInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       signatures: [
         getDescriptorSignature(UnitBindInstruction.descriptor, "ubind"),
       ],
@@ -1348,9 +1382,9 @@ export class UnitControlInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return UnitControlInstruction.descriptor.getCompletionItems(
       this.data,
@@ -1369,12 +1403,12 @@ export class UnitControlInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
       activeParameter:
         UnitControlInstruction.descriptor.getActiveSignatureParameter(
           this.data,
-          offset,
+          character,
           this.line.tokens
         ),
       activeSignature: UnitControlInstruction.descriptor.getActiveSignature(
@@ -1439,9 +1473,9 @@ export class UnitRadarinstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     switch (targetToken) {
       case this.data.filter1:
@@ -1485,9 +1519,13 @@ export class UnitRadarinstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       signatures: [
         getDescriptorSignature(UnitRadarinstruction.descriptor, "uradar"),
       ],
@@ -1607,9 +1645,9 @@ export class UnitLocateInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return UnitLocateInstruction.descriptor.getCompletionItems(
       this.data,
@@ -1636,12 +1674,12 @@ export class UnitLocateInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = UnitLocateInstruction;
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -1726,9 +1764,9 @@ export class GetBlockInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return GetBlockInstruction.descriptor.getCompletionItems(
       this.data,
@@ -1737,13 +1775,13 @@ export class GetBlockInstruction extends SyntaxNode {
     );
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = GetBlockInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -1807,9 +1845,9 @@ export class SetBlockInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return SetBlockInstruction.descriptor.getCompletionItems(
       this.data,
@@ -1828,13 +1866,13 @@ export class SetBlockInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = SetBlockInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -1868,9 +1906,13 @@ export class SpawnUnitInstruction extends SyntaxNode {
     return new SpawnUnitInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(SpawnUnitInstruction.descriptor, "spawn"),
@@ -1903,9 +1945,13 @@ export class SenseWeatherInstruction extends SyntaxNode {
     return new SenseWeatherInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(
@@ -1938,9 +1984,13 @@ export class SetWeatherInstruction extends SyntaxNode {
     return new SetWeatherInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(SetWeatherInstruction.descriptor, "weatherset"),
@@ -2044,9 +2094,9 @@ export class ApplyStatusInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return ApplyStatusInstruction.descriptor.getCompletionItems(
       this.data,
@@ -2073,13 +2123,13 @@ export class ApplyStatusInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = ApplyStatusInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -2133,9 +2183,9 @@ export class SpawnWaveInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return SpawnWaveInstruction.descriptor.getCompletionItems(
       this.data,
@@ -2162,13 +2212,13 @@ export class SpawnWaveInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = SpawnWaveInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -2307,9 +2357,9 @@ export class SetRuleInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return SetRuleInstruction.descriptor.getCompletionItems(
       this.data,
@@ -2336,13 +2386,13 @@ export class SetRuleInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = SetRuleInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -2409,9 +2459,9 @@ export class FlushMessageInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return FlushMessageInstruction.descriptor.getCompletionItems(
       this.data,
@@ -2438,13 +2488,13 @@ export class FlushMessageInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = FlushMessageInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -2500,9 +2550,9 @@ export class CutsceneInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return CutsceneInstruction.descriptor.getCompletionItems(
       this.data,
@@ -2529,13 +2579,13 @@ export class CutsceneInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = CutsceneInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -2772,9 +2822,9 @@ export class EffectInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return EffectInstruction.descriptor.getCompletionItems(
       this.data,
@@ -2801,13 +2851,13 @@ export class EffectInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = EffectInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -2844,9 +2894,13 @@ export class ExplosionInstruction extends SyntaxNode {
     return new ExplosionInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(ExplosionInstruction.descriptor, "explosion"),
@@ -2875,9 +2929,13 @@ export class SetRateInstruction extends SyntaxNode {
     return new SetRateInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(SetRateInstruction.descriptor, "setrate"),
@@ -2974,9 +3032,9 @@ export class FetchInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return FetchInstruction.descriptor.getCompletionItems(
       this.data,
@@ -3003,13 +3061,13 @@ export class FetchInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = FetchInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -3038,9 +3096,13 @@ export class SyncInstruction extends SyntaxNode {
     return new SyncInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [getDescriptorSignature(SyncInstruction.descriptor, "sync")],
     };
@@ -3068,9 +3130,13 @@ export class GetFlagInstruction extends SyntaxNode {
     return new GetFlagInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(GetFlagInstruction.descriptor, "getflag"),
@@ -3100,9 +3166,13 @@ export class SetFlagInstruction extends SyntaxNode {
     return new SetFlagInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(SetFlagInstruction.descriptor, "getflag"),
@@ -3133,9 +3203,13 @@ export class SetPropInstruction extends SyntaxNode {
     return new SetPropInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(SetPropInstruction.descriptor, "setprop"),
@@ -3203,9 +3277,9 @@ export class SetMarkerInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return SetMarkerInstruction.descriptor.getCompletionItems(
       this.data,
@@ -3232,13 +3306,13 @@ export class SetMarkerInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = SetMarkerInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -3292,9 +3366,9 @@ export class MakeMakerInstruction extends SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    offset: number
+    character: number
   ): CompletionItem[] {
-    const targetToken = getTargetToken(offset, this.line.tokens);
+    const targetToken = getTargetToken(character, this.line.tokens);
 
     return MakeMakerInstruction.descriptor.getCompletionItems(
       this.data,
@@ -3321,13 +3395,13 @@ export class MakeMakerInstruction extends SyntaxNode {
     }
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     const { descriptor } = MakeMakerInstruction;
 
     return {
       activeParameter: descriptor.getActiveSignatureParameter(
         this.data,
-        offset,
+        character,
         this.line.tokens
       ),
       activeSignature: descriptor.getActiveSignature(this.data.type),
@@ -3359,9 +3433,13 @@ export class PrintLocaleInstruction extends SyntaxNode {
     return new PrintLocaleInstruction(line, data);
   }
 
-  provideSignatureHelp(offset: number): SignatureHelp {
+  provideSignatureHelp(character: number): SignatureHelp {
     return {
-      activeParameter: getActiveParameter(this.data, offset, this.line.tokens),
+      activeParameter: getActiveParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
       activeSignature: 0,
       signatures: [
         getDescriptorSignature(
@@ -3674,10 +3752,10 @@ function createOverloadDescriptor<
     },
     getActiveSignatureParameter(
       data: OverloadData<T, Pre>,
-      offset: number,
+      character: number,
       tokens: TextToken[]
     ): number {
-      const targetToken = getTargetToken(offset, tokens);
+      const targetToken = getTargetToken(character, tokens);
       if (data.type === "unknown" && preKeys.length === 0) return -1;
 
       const keys = [...preKeys];

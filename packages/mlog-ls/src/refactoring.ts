@@ -32,7 +32,8 @@ export function convertToLabeledJumps(doc: MlogDocument): TextEdit[] {
     const { destination } = node.data;
     if (destination?.type !== "number") continue;
 
-    const index = Number(destination.content);
+    // convert negative indexes to 0
+    const index = Math.max(Number(destination.content), 0);
 
     if (referencedIndexes.has(index)) {
       referencedIndexes.get(index)!.push(node);
@@ -78,11 +79,7 @@ export function convertToLabeledJumps(doc: MlogDocument): TextEdit[] {
 
       for (const jump of jumps) {
         const { destination } = jump.data;
-        const range = Range.create(
-          doc.positionAt(destination!.start),
-          doc.positionAt(destination!.end)
-        );
-        edits.push(TextEdit.replace(range, label));
+        edits.push(TextEdit.replace(destination!, label));
       }
     }
 
@@ -125,12 +122,7 @@ export function convertToNumberedJumps(doc: MlogDocument): TextEdit[] {
     if (index !== undefined) {
       referencedLabels.add(label);
 
-      const range = Range.create(
-        doc.positionAt(destination.start),
-        doc.positionAt(destination.end)
-      );
-
-      edits.push(TextEdit.replace(range, `${index}`));
+      edits.push(TextEdit.replace(destination, `${index}`));
     }
   }
 
@@ -146,14 +138,9 @@ export function convertToNumberedJumps(doc: MlogDocument): TextEdit[] {
 }
 
 function getStartOfInstructionLine(doc: MlogDocument, node: SyntaxNode) {
-  const startPosition = doc.positionAt(node.start);
+  const { start } = node;
   const line = doc.getText(
-    Range.create(
-      startPosition.line,
-      0,
-      startPosition.line,
-      startPosition.character
-    )
+    Range.create(start.line, 0, start.line, start.character)
   );
 
   let spaceCount = 0;
@@ -163,22 +150,14 @@ function getStartOfInstructionLine(doc: MlogDocument, node: SyntaxNode) {
     spaceCount++;
   }
 
-  return Position.create(
-    startPosition.line,
-    startPosition.character - spaceCount
-  );
+  return Position.create(start.line, start.character - spaceCount);
 }
 
 function getEndOfInstructionLine(doc: MlogDocument, node: SyntaxNode) {
-  const endPosition = doc.positionAt(node.end);
+  const { end } = node;
 
   const lineSegment = doc.getText(
-    Range.create(
-      endPosition.line,
-      endPosition.character,
-      endPosition.line + 1,
-      0
-    )
+    Range.create(end.line, end.character, end.line + 1, 0)
   );
 
   // only true if the line segment
@@ -204,8 +183,8 @@ function getEndOfInstructionLine(doc: MlogDocument, node: SyntaxNode) {
   }
 
   if (endsWithNewLine) {
-    return Position.create(endPosition.line + 1, 0);
+    return Position.create(end.line + 1, 0);
   }
 
-  return Position.create(endPosition.line, endPosition.character + spaceCount);
+  return Position.create(end.line, end.character + spaceCount);
 }

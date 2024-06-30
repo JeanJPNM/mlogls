@@ -2434,14 +2434,16 @@ export function validateIgnoredToken(
   });
 }
 
-export function getTargetToken(offset: number, tokens: TextToken[]) {
+export function getTargetToken(character: number, tokens: TextToken[]) {
   // return the first token that contains the offset
   // or the next token after it
   // this allows the completion handlers
   // to perform plain equality comparisons with their respective tokens
   return (
-    tokens.find((token) => token.start <= offset && token.end >= offset) ??
-    tokens.find((token) => token.start >= offset)
+    tokens.find(
+      (token) =>
+        token.start.character <= character && character <= token.end.character
+    ) ?? tokens.find((token) => token.start.character >= character)
   );
 }
 

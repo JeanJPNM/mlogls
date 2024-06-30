@@ -125,14 +125,14 @@ export function startServer(options: LanguageServerOptions) {
     let previous = Position.create(0, 0);
 
     for (const { token, type, modifiers } of tokens) {
-      const current = doc.positionAt(token.start);
+      const current = token.start;
 
       const deltaLine = current.line - previous.line;
       const deltaStart =
         deltaLine === 0
           ? current.character - previous.character
           : current.character;
-      const length = token.end - token.start;
+      const length = token.end.character - token.start.character;
       let tokenType = type ?? TokenTypes.variable;
 
       let tokenModifiers = modifiers ?? 0;
@@ -178,8 +178,8 @@ export function startServer(options: LanguageServerOptions) {
         colors.push({
           color: { red, green, blue, alpha },
           range: Range.create(
-            doc.positionAt(line.tokens[2].start),
-            doc.positionAt(line.tokens[5]?.end ?? line.end)
+            line.tokens[2].start,
+            line.tokens[5]?.end ?? line.end
           ),
         });
         continue;
@@ -190,10 +190,7 @@ export function startServer(options: LanguageServerOptions) {
           const color = parseColor(token.content.slice(1));
 
           colors.push({
-            range: Range.create(
-              doc.positionAt(token.start),
-              doc.positionAt(token.end)
-            ),
+            range: Range.create(token.start, token.end),
             color,
           });
           continue;
@@ -210,7 +207,7 @@ export function startServer(options: LanguageServerOptions) {
     const doc = documents.get(textDocument.uri);
     if (!doc) return [];
 
-    const line = getSelectedLine(doc, doc.offsetAt(range.start));
+    const line = getSelectedLine(doc, range.start);
     if (line?.tokens[0].content === "packcolor") {
       const { red, green, blue, alpha } = color;
       // three digits of precision is enough, since each "step" has a value of 0,255
@@ -240,28 +237,23 @@ export function startServer(options: LanguageServerOptions) {
     const doc = documents.get(params.textDocument.uri);
     if (!doc) return [];
 
-    const offset = doc.offsetAt(params.position);
+    const { position } = params;
 
-    // const line = getSelectedLine(doc, offset);
-    const node = getSelectedSyntaxNode(doc, offset);
+    const node = getSelectedSyntaxNode(doc, position);
     const line = node?.line;
 
-    const selectedToken = line?.tokens.find(
-      (token) => token.start <= offset && token.end >= offset
+    const selectedToken = line?.tokens.find((token) =>
+      containsPosition(token, position)
     );
 
     const range = selectedToken
-      ? Range.create(
-          doc.positionAt(selectedToken.start),
-          doc.positionAt(selectedToken.end)
-        )
+      ? Range.create(selectedToken.start, selectedToken.end)
       : Range.create(params.position, params.position);
 
     // show completions for instructions if:
-    // - there are no token lines in the document (likely means the document is empty)
+    // - no token line is selected
     // - the cursor is contained within the first token of the selected token line
-    // - the cursor is outside the selected token line
-    if (!line || selectedToken === line.tokens[0] || line.end < offset) {
+    if (!line || selectedToken === line.tokens[0]) {
       return {
         items: getInstructionNames().map((code) => ({
           label: code,
@@ -298,7 +290,7 @@ export function startServer(options: LanguageServerOptions) {
     };
 
     const completionList = CompletionList.create(
-      node.provideCompletionItems(context, offset)
+      node.provideCompletionItems(context, position.character)
     );
 
     completionList.itemDefaults = {
@@ -311,25 +303,12 @@ export function startServer(options: LanguageServerOptions) {
     const doc = documents.get(params.textDocument.uri);
     if (!doc) return;
 
-    const offset = doc.offsetAt(params.position);
+    const { position } = params;
 
-    const node = getSelectedSyntaxNode(doc, offset);
-    // const line = getSelectedLine(doc, offset);
-    // if (!line) return;
+    const node = getSelectedSyntaxNode(doc, params.position);
     if (!node) return;
 
-    return node.provideSignatureHelp(offset);
-
-    // const inst = getInstructionHandler(line.tokens[0].content);
-    // if (!inst) return;
-
-    // const data = inst.parse(line.tokens);
-
-    // return inst.provideSignatureHelp({
-    //   data,
-    //   offset,
-    //   tokens: line.tokens,
-    // });
+    return node.provideSignatureHelp(position.character);
   });
 
   connection.onDocumentFormatting((params) => {
@@ -355,8 +334,7 @@ export function startServer(options: LanguageServerOptions) {
     const doc = documents.get(textDocument.uri);
     if (!doc) return;
 
-    const start = doc.offsetAt(range.start);
-    const end = doc.offsetAt(range.end);
+    const { start, end } = range;
 
     let hasIndexJump = false;
     let hasLabelJump = false;
@@ -440,10 +418,7 @@ export function startServer(options: LanguageServerOptions) {
     for (const diagnostic of parserDiagnostics) {
       diagnostics.push({
         ...diagnostic,
-        range: Range.create(
-          doc.positionAt(diagnostic.start),
-          doc.positionAt(diagnostic.end)
-        ),
+        range: Range.create(diagnostic.start, diagnostic.end),
         source: "mlog",
       });
     }
@@ -467,8 +442,8 @@ export function startServer(options: LanguageServerOptions) {
   connection.listen();
 }
 
-function getSelectedSyntaxNode(doc: MlogDocument, offset: number) {
-  return doc.nodes.find((node) => node.start <= offset && node.end >= offset);
+function getSelectedSyntaxNode(doc: MlogDocument, position: Position) {
+  return doc.nodes.find((node) => containsPosition(node, position));
 }
 
 /**
@@ -477,20 +452,28 @@ function getSelectedSyntaxNode(doc: MlogDocument, offset: number) {
  */
 function getSelectedLine(
   doc: MlogDocument,
-  offset: number
+  position: Position
 ): TokenLine | undefined {
-  return getSelectedSyntaxNode(doc, offset)?.line;
+  return getSelectedSyntaxNode(doc, position)?.line;
 }
 
 function* getPartiallySelectedSyntaxNodes(
   doc: MlogDocument,
-  start: number,
-  end: number
+  start: Position,
+  end: Position
 ) {
   for (const node of doc.nodes) {
-    if (node.end <= start) continue;
-    if (node.start >= end) break;
+    if (node.end < start) continue;
+    if (node.start > end) break;
 
     yield node;
   }
+}
+
+function containsPosition(range: Range, position: Position) {
+  return (
+    range.start.line === position.line &&
+    range.start.character <= position.character &&
+    position.character <= range.end.character
+  );
 }

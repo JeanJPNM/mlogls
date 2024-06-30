@@ -1,6 +1,5 @@
-import { Diagnostic, DiagnosticSeverity, Range } from "vscode-languageserver";
+import { Diagnostic, Position } from "vscode-languageserver";
 import { getInstructionHandler } from "../instructions";
-import { TextDocument } from "vscode-languageserver-textdocument";
 
 export type TextTokenType =
   | "comment"
@@ -10,11 +9,15 @@ export type TextTokenType =
   | "label"
   | "identifier";
 
+export class ParserPosition implements Position {
+  constructor(public line: number, public character: number) {}
+}
+
 export class TextToken {
   type: TextTokenType;
   constructor(
-    public start: number,
-    public end: number,
+    public start: ParserPosition,
+    public end: ParserPosition,
     public content: string
   ) {
     this.type = getTextTokenType(content);
@@ -50,13 +53,6 @@ export class TextToken {
       this.isNumber
     );
   }
-
-  toRange(doc: TextDocument): Range {
-    return {
-      start: doc.positionAt(this.start),
-      end: doc.positionAt(this.end),
-    };
-  }
 }
 
 function getTextTokenType(content: string): TextTokenType {
@@ -78,8 +74,8 @@ function getTextTokenType(content: string): TextTokenType {
  */
 export class TokenLine {
   constructor(
-    public start: number,
-    public end: number,
+    public start: ParserPosition,
+    public end: ParserPosition,
     public tokens: TextToken[]
   ) {}
 }
@@ -87,8 +83,8 @@ export class TokenLine {
 export type Lines = TokenLine[];
 
 export type ParserDiagnostic = Omit<Diagnostic, "range"> & {
-  start: number;
-  end: number;
+  start: ParserPosition;
+  end: ParserPosition;
 };
 
 const missingSpaceErrorMessage = "Expected space after string.";
@@ -105,16 +101,20 @@ export function tokenize(chars: string) {
   };
 
   let pos = 0;
+  let line = 0;
+  let lineStart = 0;
 
   while (pos < chars.length) {
     switch (chars[pos]) {
       case "\n":
+        line++;
+        pos++;
+        lineStart = pos;
+        break;
       case ";":
       case " ":
-        pos++; //skip newlines and spaces
-        break;
       case "\r":
-        pos += 2; //skip the newline after the \r
+        pos++; //skip newlines and spaces
         break;
       default:
         statement();
@@ -134,19 +134,26 @@ export function tokenize(chars: string) {
   //   i.jump.dest = jumpLocations.get(i.location?.content) ?? -1;
   // }
 
+  function getCurrentLocation(): ParserPosition {
+    return new ParserPosition(line, pos - lineStart);
+  }
+
   function parseComment(): TextToken {
-    const start = pos;
+    const start = getCurrentLocation();
+    const startPos = pos;
     //read until \n or eof
     while (pos < chars.length && chars[pos] != "\n" && chars[pos] != "\r") {
       pos++;
     }
-    const end = pos;
+    const end = getCurrentLocation();
+    const endPos = pos;
 
-    return new TextToken(start, end, chars.slice(start, end));
+    return new TextToken(start, end, chars.slice(startPos, endPos));
   }
 
   function parseString(): TextToken {
-    let from = pos;
+    const start = getCurrentLocation();
+    const startPos = pos;
 
     while (++pos < chars.length) {
       const c = chars[pos];
@@ -156,15 +163,21 @@ export function tokenize(chars: string) {
     }
 
     if (pos >= chars.length || chars[pos] != '"') {
-      emitError(from, pos + 1, 'Missing closing quote " before end of line.');
+      emitError(
+        start,
+        getCurrentLocation(),
+        'Missing closing quote " before end of line.'
+      );
     }
-
-    const end = ++pos;
-    return new TextToken(from, end, chars.slice(from, end));
+    pos++;
+    const end = getCurrentLocation();
+    const endPos = pos;
+    return new TextToken(start, end, chars.slice(startPos, endPos));
   }
 
   function parseToken(): TextToken {
-    const start = pos;
+    const start = getCurrentLocation();
+    const startPos = pos;
 
     while (pos < chars.length) {
       const c = chars[pos];
@@ -180,11 +193,16 @@ export function tokenize(chars: string) {
       pos++;
     }
 
-    const end = pos;
-    return new TextToken(start, end, chars.slice(start, end));
+    const end = getCurrentLocation();
+    const endPos = pos;
+    return new TextToken(start, end, chars.slice(startPos, endPos));
   }
 
-  function emitError(start: number, end: number, message: string) {
+  function emitError(
+    start: ParserPosition,
+    end: ParserPosition,
+    message: string
+  ) {
     diagnostics.push({ start, end, message });
   }
 
@@ -203,7 +221,7 @@ export function tokenize(chars: string) {
 
   /** Reads the next statement until EOL/EOF. */
   function statement() {
-    const start = pos;
+    const start = getCurrentLocation();
     let expectNext = false;
     let missingSpace = false;
 
@@ -252,7 +270,7 @@ export function tokenize(chars: string) {
       }
     }
 
-    const end = pos;
+    const end = getCurrentLocation();
 
     //only process lines with at least 1 token
     if (tokens.length === 0) return;

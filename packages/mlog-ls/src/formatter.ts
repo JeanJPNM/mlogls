@@ -22,14 +22,11 @@ export function formatCode({
   let result = "";
   let lineNumber = 0;
   let i = 0;
-  let minLines = 0;
-  let maxLines = 2;
 
-  for (const { end, indent } of identationBlocks) {
-    let firstRun = true;
+  for (const { start, end, indent } of identationBlocks) {
     for (; i < end; i++) {
       const node = nodes[i];
-      const pos = doc.positionAt(node.start);
+      const pos = node.start;
 
       let minLines = 1;
       let maxLines = 3;
@@ -38,7 +35,7 @@ export function formatCode({
         // no need to force at least one line before the first instruction
         minLines--;
         maxLines--;
-      } else if (firstRun && !indent) {
+      } else if (i === start && !indent) {
         // make sure that non-indented lines have
         // at least one line empty line
         // separating them from the previous block
@@ -52,7 +49,6 @@ export function formatCode({
       }
 
       result += node.line.tokens.map((token) => token.content).join(" ");
-      firstRun = false;
 
       lineNumber = pos.line;
     }
@@ -96,8 +92,7 @@ function getIdentationBlocks(doc: MlogDocument) {
       const node = nodes[i];
       if (!(node instanceof CommentLine)) break;
 
-      const pos = doc.positionAt(node.start);
-      if (pos.character !== 0) continue;
+      if (node.start.character !== 0) continue;
 
       start = i;
     }
@@ -114,8 +109,7 @@ function getIdentationBlocks(doc: MlogDocument) {
       const node = nodes[i];
       if (!(node instanceof CommentLine)) break;
 
-      const pos = doc.positionAt(node.start);
-      if (pos.character !== 0) continue;
+      if (node.start.character !== 0) continue;
 
       start = i;
     }
