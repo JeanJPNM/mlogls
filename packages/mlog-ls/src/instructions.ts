@@ -1,18 +1,15 @@
 import {
-  ColorInformation,
-  ColorPresentation,
   CompletionItem,
   CompletionItemKind,
   DiagnosticSeverity,
   MarkupContent,
   MarkupKind,
   ParameterInformation,
-  Range,
   SignatureHelp,
   SignatureInformation,
 } from "vscode-languageserver";
 import { type ParserDiagnostic, TextToken } from "./parser/tokenize";
-import { TokenTypes, type SemanticTokenType } from "./protocol";
+import { TokenTypes } from "./protocol";
 
 export interface TokenSemanticData {
   token: TextToken;

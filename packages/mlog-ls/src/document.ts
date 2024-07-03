@@ -1,10 +1,5 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
-import {
-  type ParserDiagnostic,
-  TextToken,
-  tokenize,
-  TokenLine,
-} from "./parser/tokenize";
+import { type ParserDiagnostic, tokenize, TokenLine } from "./parser/tokenize";
 import {
   Position,
   Range,

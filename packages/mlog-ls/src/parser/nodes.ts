@@ -19,15 +19,9 @@ import {
   TextToken,
   TokenLine,
 } from "./tokenize";
-import { SemanticTokenType, TokenModifiers, TokenTypes } from "../protocol";
+import { TokenModifiers, TokenTypes } from "../protocol";
 
 const restrictedTokenCompletionKind = CompletionItemKind.Keyword;
-
-interface TokenServiceProvider {
-  provideTokenSemantics(tokens: TokenSemanticData[]): void;
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void;
-}
 
 export abstract class SyntaxNode {
   abstract type: string;
