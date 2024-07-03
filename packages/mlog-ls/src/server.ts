@@ -36,8 +36,8 @@ export interface LanguageServerOptions {
 }
 
 enum Commands {
-  useJumpLabels = "mlog.useJumpLabels",
-  useJumpIndexes = "mlog.useJumpIndexes",
+  useJumpLabels = "mlog-ls.useJumpLabels",
+  useJumpIndexes = "mlog-ls.useJumpIndexes",
 }
 
 export function startServer(options: LanguageServerOptions) {
