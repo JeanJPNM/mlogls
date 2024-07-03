@@ -21,7 +21,7 @@ import {
 } from "./tokenize";
 import { TokenModifiers, TokenTypes } from "../protocol";
 
-const restrictedTokenCompletionKind = CompletionItemKind.Keyword;
+const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
 export abstract class SyntaxNode {
   abstract type: string;
