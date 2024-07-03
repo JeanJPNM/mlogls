@@ -463,8 +463,11 @@ function* getPartiallySelectedSyntaxNodes(
   end: Position
 ) {
   for (const node of doc.nodes) {
-    if (node.end < start) continue;
-    if (node.start > end) break;
+    if (node.start.line < start.line) continue;
+    if (node.start.line > end.line) break;
+
+    if (node.end.character < start.character) continue;
+    if (node.start.character > end.character) break;
 
     yield node;
   }
