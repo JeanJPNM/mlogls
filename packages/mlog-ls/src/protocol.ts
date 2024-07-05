@@ -47,6 +47,19 @@ export const TokenModifiers = createTokenLegend(tokenModifiers, (i) => 1 << i);
 
 export const TokenTypes = createTokenLegend(tokenTypes, (i) => i);
 
+export enum DiagnosticCode {
+  ignoredValue = "ignored-value",
+  unusedLabel = "unused-label",
+  undefinedLabel = "undefined-label",
+  unusedVariable = "unused-variable",
+  writingToReadOnly = "writing-to-readonly",
+  outOfRangeValue = "out-of-range-value",
+  excessPackcolorPrecision = "excess-packcolor-precision",
+  lineTooLong = "line-too-long",
+  unknownInstruction = "unknown-instruction",
+  unknownVariant = "unknown-variant",
+}
+
 type TokenLegend<K extends string> = Record<K, number> & { keys: K[] };
 
 function createTokenLegend<const K extends string>(

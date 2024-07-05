@@ -1,6 +1,7 @@
 import { Diagnostic, Position } from "vscode-languageserver";
 import { getInstructionHandler } from "../instructions";
 
+// TODO: emit error if there are more than 500 jumps
 export type TextTokenType =
   | "comment"
   | "string"

@@ -9,7 +9,7 @@ import {
   SignatureInformation,
 } from "vscode-languageserver";
 import { type ParserDiagnostic, TextToken } from "./parser/tokenize";
-import { TokenTypes } from "./protocol";
+import { DiagnosticCode, TokenTypes } from "./protocol";
 
 export interface TokenSemanticData {
   token: TextToken;
@@ -2412,6 +2412,7 @@ export function validateRestrictedToken(
     end: token.end,
     message: message + token.content,
     severity: DiagnosticSeverity.Warning,
+    code: DiagnosticCode.unknownVariant,
   });
 }
 

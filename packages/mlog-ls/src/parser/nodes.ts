@@ -2,6 +2,7 @@ import {
   CompletionItem,
   CompletionItemKind,
   DiagnosticSeverity,
+  DiagnosticTag,
   ParameterInformation,
   SignatureHelp,
   SignatureInformation,
@@ -19,7 +20,7 @@ import {
   TextToken,
   TokenLine,
 } from "./tokenize";
-import { TokenModifiers, TokenTypes } from "../protocol";
+import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
 
 const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -46,6 +47,7 @@ export abstract class SyntaxNode {
         end: tokens[tokens.length - 1].end,
         message: "Line too long; may only contain 16 tokens",
         severity: DiagnosticSeverity.Error,
+        code: DiagnosticCode.lineTooLong,
       });
     }
   }
@@ -82,6 +84,8 @@ export class CommentLine extends SyntaxNode {
   }
 }
 
+// TODO: emit error if there are other tokens after the label
+// except for comments
 export class LabelDeclaration extends SyntaxNode {
   type = "LabelDeclaration" as const;
   isInstruction = false;
@@ -141,6 +145,7 @@ export class UnknownInstruction extends SyntaxNode {
       start: name.start,
       end: name.end,
       severity: DiagnosticSeverity.Warning,
+      code: DiagnosticCode.unknownInstruction,
     });
   }
 }
@@ -329,6 +334,7 @@ export class DrawInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
 
       return;
@@ -596,6 +602,7 @@ export class ControlInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -913,25 +920,28 @@ export class OpInstruction extends SyntaxNode {
   ): CompletionItem[] {
     const targetToken = getTargetToken(character, this.line.tokens);
 
-    if (targetToken === this.data.typeToken) {
-      return Object.keys(OpInstruction.descriptor.overloads).map(
-        (type): CompletionItem => ({
-          label: type,
-          kind: CompletionItemKind.Operator,
-        })
-      );
-    }
-
-    return context.getVariableCompletions();
+    return OpInstruction.descriptor.getCompletionItems(
+      this.data,
+      context,
+      targetToken
+    );
   }
 
   provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { typeToken } = this.data;
+    const { type, typeToken } = this.data;
     if (typeToken) {
       tokens.push({
         type: TokenTypes.operator,
         token: typeToken,
       });
+    }
+
+    if (type !== "unknown") {
+      provideMemberSemantics(
+        OpInstruction.descriptor.overloads[type],
+        this.data,
+        tokens
+      );
     }
   }
 
@@ -1123,6 +1133,7 @@ export class PackColorInstruction extends SyntaxNode {
           end: token.end,
           message: "packcolor parameters must be within the range: [0, 1]",
           severity: DiagnosticSeverity.Warning,
+          code: DiagnosticCode.outOfRangeValue,
         });
         // emit a warning if the number has more than 3 decimal digits
         // because with three digits the smallest step is 0.001 * 255 = 0.255
@@ -1137,6 +1148,7 @@ export class PackColorInstruction extends SyntaxNode {
           message:
             "Only 3 decimal digits are necessary for packcolor parameters.",
           severity: DiagnosticSeverity.Warning,
+          code: DiagnosticCode.excessPackcolorPrecision,
         });
       }
     }
@@ -1222,6 +1234,7 @@ export class JumpInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -1370,6 +1383,7 @@ export class UnitControlInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -1625,6 +1639,7 @@ export class UnitLocateInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
 
@@ -1734,6 +1749,7 @@ export class GetBlockInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -1833,6 +1849,7 @@ export class SetBlockInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -2074,6 +2091,7 @@ export class ApplyStatusInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
 
@@ -2171,6 +2189,7 @@ export class SpawnWaveInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -2337,6 +2356,7 @@ export class SetRuleInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
 
@@ -2439,6 +2459,7 @@ export class FlushMessageInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
 
@@ -2538,6 +2559,7 @@ export class CutsceneInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -2802,6 +2824,7 @@ export class EffectInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
 
@@ -3012,6 +3035,7 @@ export class FetchInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
 
@@ -3265,6 +3289,7 @@ export class SetMarkerInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -3354,6 +3379,7 @@ export class MakeMakerInstruction extends SyntaxNode {
         start: typeToken.start,
         end: typeToken.end,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unknownVariant,
       });
     }
   }
@@ -3604,6 +3630,8 @@ function validateMembers<T extends SingleDescriptor>(
         end: token.end,
         message: `This parameter is ignored by this instruction. Replace it with an underscore.`,
         severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.ignoredValue,
+        tags: [DiagnosticTag.Unnecessary],
       });
     }
   }
