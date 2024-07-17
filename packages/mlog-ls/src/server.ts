@@ -30,6 +30,7 @@ import {
 import { formatCode } from "./formatter";
 import { JumpInstruction, getInstructionNames } from "./parser/nodes";
 import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
+import { findLabelDefinition, findLabelUsageLocations } from "./analysis";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -103,6 +104,7 @@ export function startServer(options: LanguageServerOptions) {
         executeCommandProvider: {
           commands: Object.values(Commands),
         },
+        definitionProvider: true,
       },
     };
 
@@ -402,6 +404,35 @@ export function startServer(options: LanguageServerOptions) {
         break;
       }
     }
+  });
+
+  connection.onDefinition((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return;
+
+    const { position } = params;
+    const node = getSelectedSyntaxNode(doc, position);
+    if (!(node instanceof JumpInstruction)) return;
+
+    const selectedToken = node.line.tokens.find((token) =>
+      containsPosition(token, position)
+    );
+
+    if (!selectedToken || selectedToken !== node.data.destination) return;
+
+    const { destination } = node.data;
+
+    const definitionLocation = findLabelDefinition(
+      destination.content,
+      doc.nodes
+    );
+
+    if (!definitionLocation) return;
+
+    return {
+      uri: params.textDocument.uri,
+      range: definitionLocation,
+    };
   });
 
   documents.onDidChangeContent((change) => {
