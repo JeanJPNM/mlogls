@@ -8,20 +8,6 @@ import {
 } from "./parser/nodes";
 import { TextToken } from "./parser/tokenize";
 
-export class DeclarationContext {
-  variables = new Set<string>();
-  labels = new Set<string>();
-
-  addVariable(token: TextToken | undefined) {
-    if (token?.type !== "identifier") return;
-    this.variables.add(token.content);
-  }
-
-  addLabel(name: string) {
-    this.labels.add(name);
-  }
-}
-
 export function findVariableUsageLocations(
   variable: string,
   nodes: SyntaxNode[]
@@ -45,17 +31,20 @@ export function findVariableUsageLocations(
 
 export function findVariableWriteLocations(
   variable: string,
-  nodes: SyntaxNode
+  nodes: SyntaxNode[]
 ) {
   const locations: Range[] = [];
-  if (nodes instanceof InstructionNode) {
-    for (const param of nodes.parameters) {
-      if (
-        param.type === ParameterType.variable &&
-        param.usage === ParameterUsage.write &&
-        param.token.content === variable
-      ) {
-        locations.push(param.token);
+
+  for (const node of nodes) {
+    if (node instanceof InstructionNode) {
+      for (const param of node.parameters) {
+        if (
+          param.type === ParameterType.variable &&
+          param.usage === ParameterUsage.write &&
+          param.token.content === variable
+        ) {
+          locations.push(param.token);
+        }
       }
     }
   }
@@ -67,16 +56,7 @@ export function findLabelReferences(label: string, nodes: SyntaxNode[]) {
   const locations: Range[] = [];
   for (const node of nodes) {
     if (node instanceof LabelDeclaration && node.name === label) {
-      const { nameToken } = node;
-
-      locations.push(
-        Range.create(
-          nameToken.start.line,
-          nameToken.start.character,
-          nameToken.end.line,
-          nameToken.end.character - 1 // ignore the trailing ':'
-        )
-      );
+      locations.push(labelDeclarationNameRange(node.nameToken));
       continue;
     }
 
@@ -99,15 +79,17 @@ export function findLabelDefinition(label: string, nodes: SyntaxNode[]) {
     if (!(node instanceof LabelDeclaration)) continue;
     if (node.name !== label) continue;
 
-    const { nameToken } = node;
-
-    location = Range.create(
-      nameToken.start.line,
-      nameToken.start.character,
-      nameToken.end.line,
-      nameToken.end.character - 1 // ignore the trailing ':'
-    );
+    location = labelDeclarationNameRange(node.nameToken);
     break;
   }
   return location;
+}
+
+export function labelDeclarationNameRange(textToken: TextToken) {
+  return Range.create(
+    textToken.start.line,
+    textToken.start.character,
+    textToken.end.line,
+    textToken.end.character - 1 // ignore the trailing ':'
+  );
 }
