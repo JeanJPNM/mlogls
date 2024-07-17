@@ -7,8 +7,8 @@ import {
   SignatureInformation,
 } from "vscode-languageserver";
 import { ParserDiagnostic, TextToken } from "./tokenize";
-import { CompletionContext, TokenSemanticData } from "../instructions";
 import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
+import { CompletionContext, TokenSemanticData } from "../analysis";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 

@@ -4,26 +4,21 @@ import {
   SignatureHelp,
 } from "vscode-languageserver";
 import {
-  CompletionContext,
-  TokenSemanticData,
-  getTargetToken,
-} from "../instructions";
-import {
   ParserDiagnostic,
   ParserPosition,
   TextToken,
   TokenLine,
 } from "./tokenize";
-import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
+import { DiagnosticCode, TokenTypes } from "../protocol";
 import {
   createOverloadDescriptor,
   createSingleDescriptor,
   DataOf,
   InstructionDescriptor,
   InstructionParameter,
-  restrictedTokenCompletionKind,
 } from "./descriptors";
 import { counterVar } from "../constants";
+import { CompletionContext, TokenSemanticData } from "../analysis";
 
 export abstract class SyntaxNode {
   abstract type: string;
@@ -1043,11 +1038,10 @@ export class UnitLocateInstruction extends InstructionNode<
           },
         },
         _enemy: {},
-        ore: {},
-        outX: {},
-        outY: {},
-        found: {},
-        building: {},
+        ore: { isOutput: true },
+        x: { isOutput: true },
+        y: { isOutput: true },
+        found: { isOutput: true },
       },
       building: {
         group: {
@@ -1058,10 +1052,10 @@ export class UnitLocateInstruction extends InstructionNode<
         },
         enemy: {},
         _ore: {},
-        outX: {},
-        outY: {},
-        found: {},
-        building: {},
+        x: { isOutput: true },
+        y: { isOutput: true },
+        found: { isOutput: true },
+        building: { isOutput: true },
       },
       spawn: {
         _group: {
@@ -1072,10 +1066,10 @@ export class UnitLocateInstruction extends InstructionNode<
         },
         _enemy: {},
         _ore: {},
-        outX: {},
-        outY: {},
-        found: {},
-        building: {},
+        x: { isOutput: true },
+        y: { isOutput: true },
+        found: { isOutput: true },
+        building: { isOutput: true },
       },
       damaged: {
         _group: {
@@ -1086,10 +1080,10 @@ export class UnitLocateInstruction extends InstructionNode<
         },
         _enemy: {},
         _ore: {},
-        outX: {},
-        outY: {},
-        found: {},
-        building: {},
+        x: { isOutput: true },
+        y: { isOutput: true },
+        found: { isOutput: true },
+        building: { isOutput: true },
       },
     },
   });
@@ -2075,4 +2069,17 @@ export function getSyntaxNodes(lines: TokenLine[]) {
   }
 
   return nodes;
+}
+
+function getTargetToken(character: number, tokens: TextToken[]) {
+  // return the first token that contains the offset
+  // or the next token after it
+  // this allows the completion handlers
+  // to perform plain equality comparisons with their respective tokens
+  return (
+    tokens.find(
+      (token) =>
+        token.start.character <= character && character <= token.end.character
+    ) ?? tokens.find((token) => token.start.character >= character)
+  );
 }

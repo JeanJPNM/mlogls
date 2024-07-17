@@ -1,5 +1,4 @@
 import { Diagnostic, Position } from "vscode-languageserver";
-import { getInstructionHandler } from "../instructions";
 
 // TODO: emit error if there are more than 500 jumps
 export type TextTokenType =
@@ -287,33 +286,6 @@ export function tokenize(chars: string) {
   }
 
   return { lines, diagnostics };
-}
-
-export function findLabels(lines: Lines) {
-  const labels = new Set<string>();
-  for (const { tokens: line } of lines) {
-    if (line[0].type === "label") {
-      labels.add(line[0].content.slice(0, -1));
-    }
-  }
-
-  return labels;
-}
-
-export function declaredVariables(lines: Lines) {
-  const variables = new Set<string>();
-
-  for (const { tokens: line } of lines) {
-    const inst = getInstructionHandler(line[0].content);
-    if (!inst) continue;
-    const data = inst.parse(line);
-    const outputs = inst.getOutputs(data);
-    for (const output of outputs) {
-      variables.add(output);
-    }
-  }
-
-  return variables;
 }
 
 export function parseColor(color: string) {

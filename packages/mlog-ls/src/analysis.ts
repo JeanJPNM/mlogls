@@ -1,4 +1,4 @@
-import { Range } from "vscode-languageserver";
+import { CompletionItem, Range } from "vscode-languageserver";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
 import {
   InstructionNode,
@@ -7,6 +7,46 @@ import {
   SyntaxNode,
 } from "./parser/nodes";
 import { TextToken } from "./parser/tokenize";
+
+export interface TokenSemanticData {
+  token: TextToken;
+  type: number;
+  modifiers?: number;
+}
+
+export interface CompletionContext {
+  getVariableCompletions(): CompletionItem[];
+  getLabelCompletions(): CompletionItem[];
+}
+
+export function findLabels(nodes: SyntaxNode[]) {
+  const labels = new Set<string>();
+  for (const node of nodes) {
+    if (!(node instanceof LabelDeclaration)) continue;
+    labels.add(node.name);
+  }
+
+  return labels;
+}
+
+export function declaredVariables(nodes: SyntaxNode[]) {
+  const variables = new Set<string>();
+
+  for (const node of nodes) {
+    if (!(node instanceof InstructionNode)) continue;
+
+    for (const param of node.parameters) {
+      if (
+        param.type === ParameterType.variable &&
+        param.usage === ParameterUsage.write
+      ) {
+        variables.add(param.token.content);
+      }
+    }
+  }
+
+  return variables;
+}
 
 export function findVariableUsageLocations(
   variable: string,

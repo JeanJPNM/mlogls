@@ -18,15 +18,8 @@ import {
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
-import { TokenSemanticData, CompletionContext } from "./instructions";
 import { builtinGlobals, keywordConstants } from "./constants";
-import {
-  ParserDiagnostic,
-  TokenLine,
-  declaredVariables,
-  findLabels,
-  parseColor,
-} from "./parser/tokenize";
+import { ParserDiagnostic, TokenLine, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
   InstructionNode,
@@ -36,11 +29,15 @@ import {
 } from "./parser/nodes";
 import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
 import {
+  CompletionContext,
+  declaredVariables,
   findLabelDefinition,
   findLabelReferences,
+  findLabels,
   findVariableUsageLocations,
   findVariableWriteLocations,
   labelDeclarationNameRange,
+  TokenSemanticData,
 } from "./analysis";
 import { ParameterType } from "./parser/descriptors";
 
@@ -283,7 +280,7 @@ export function startServer(options: LanguageServerOptions) {
 
     const context: CompletionContext = {
       getVariableCompletions() {
-        return [...builtinGlobals, ...declaredVariables(doc.lines)].map(
+        return [...builtinGlobals, ...declaredVariables(doc.nodes)].map(
           (variable): CompletionItem => ({
             label: variable,
             kind:
@@ -297,7 +294,7 @@ export function startServer(options: LanguageServerOptions) {
         );
       },
       getLabelCompletions() {
-        return [...findLabels(doc.lines)].map((label) => ({
+        return [...findLabels(doc.nodes)].map((label) => ({
           label,
           kind: CompletionItemKind.Function,
         }));
