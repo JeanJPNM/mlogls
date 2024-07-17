@@ -63,9 +63,23 @@ export function findVariableWriteLocations(
   return locations;
 }
 
-export function findLabelUsageLocations(label: string, nodes: SyntaxNode[]) {
+export function findLabelReferences(label: string, nodes: SyntaxNode[]) {
   const locations: Range[] = [];
   for (const node of nodes) {
+    if (node instanceof LabelDeclaration && node.name === label) {
+      const { nameToken } = node;
+
+      locations.push(
+        Range.create(
+          nameToken.start.line,
+          nameToken.start.character,
+          nameToken.end.line,
+          nameToken.end.character - 1 // ignore the trailing ':'
+        )
+      );
+      continue;
+    }
+
     if (!(node instanceof JumpInstruction)) continue;
 
     for (const param of node.parameters) {
@@ -82,12 +96,18 @@ export function findLabelDefinition(label: string, nodes: SyntaxNode[]) {
   let location: Range | undefined;
 
   for (const node of nodes) {
-    if (node instanceof LabelDeclaration) {
-      if (node.name === label) {
-        location = node.line.tokens[0];
-        break;
-      }
-    }
+    if (!(node instanceof LabelDeclaration)) continue;
+    if (node.name !== label) continue;
+
+    const { nameToken } = node;
+
+    location = Range.create(
+      nameToken.start.line,
+      nameToken.start.character,
+      nameToken.end.line,
+      nameToken.end.character - 1 // ignore the trailing ':'
+    );
+    break;
   }
   return location;
 }

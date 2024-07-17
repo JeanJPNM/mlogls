@@ -28,9 +28,21 @@ import {
   parseColor,
 } from "./parser/tokenize";
 import { formatCode } from "./formatter";
-import { JumpInstruction, getInstructionNames } from "./parser/nodes";
+import {
+  InstructionNode,
+  JumpInstruction,
+  LabelDeclaration,
+  getInstructionNames,
+} from "./parser/nodes";
 import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
-import { findLabelDefinition, findLabelUsageLocations } from "./analysis";
+import {
+  findLabelDefinition,
+  findLabelReferences,
+  findVariableUsageLocations,
+  findVariableWriteLocations,
+  labelDeclarationNameRange,
+} from "./analysis";
+import { ParameterType } from "./parser/descriptors";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -105,6 +117,7 @@ export function startServer(options: LanguageServerOptions) {
           commands: Object.values(Commands),
         },
         definitionProvider: true,
+        referencesProvider: true,
       },
     };
 
@@ -286,7 +299,7 @@ export function startServer(options: LanguageServerOptions) {
       getLabelCompletions() {
         return [...findLabels(doc.lines)].map((label) => ({
           label,
-          kind: CompletionItemKind.Property,
+          kind: CompletionItemKind.Function,
         }));
       },
     };
@@ -412,27 +425,87 @@ export function startServer(options: LanguageServerOptions) {
 
     const { position } = params;
     const node = getSelectedSyntaxNode(doc, position);
-    if (!(node instanceof JumpInstruction)) return;
 
-    const selectedToken = node.line.tokens.find((token) =>
-      containsPosition(token, position)
+    if (
+      node instanceof LabelDeclaration &&
+      containsPosition(node.nameToken, position)
+    ) {
+      return {
+        uri: params.textDocument.uri,
+        range: labelDeclarationNameRange(node.nameToken),
+      };
+    }
+
+    if (!(node instanceof InstructionNode)) return;
+
+    const selectedParameter = node.parameters.find((param) =>
+      containsPosition(param.token, position)
     );
 
-    if (!selectedToken || selectedToken !== node.data.destination) return;
+    if (!selectedParameter) return;
 
-    const { destination } = node.data;
+    const name = selectedParameter.token.content;
 
-    const definitionLocation = findLabelDefinition(
-      destination.content,
-      doc.nodes
+    switch (selectedParameter.type) {
+      case ParameterType.variable:
+        return findVariableWriteLocations(name, doc.nodes).map((location) => ({
+          uri: params.textDocument.uri,
+          range: location,
+        }));
+      case ParameterType.label: {
+        const location = findLabelDefinition(name, doc.nodes);
+        if (!location) return;
+
+        return {
+          uri: params.textDocument.uri,
+          range: location,
+        };
+      }
+    }
+  });
+
+  connection.onReferences((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return;
+
+    const { position } = params;
+
+    const node = getSelectedSyntaxNode(doc, position);
+
+    if (
+      node instanceof LabelDeclaration &&
+      containsPosition(node.nameToken, position)
+    ) {
+      const locations = findLabelReferences(node.name, doc.nodes);
+
+      return locations.map((location) => ({
+        uri: params.textDocument.uri,
+        range: location,
+      }));
+    }
+
+    if (!(node instanceof InstructionNode)) return;
+
+    const selectedParameter = node.parameters.find((param) =>
+      containsPosition(param.token, position)
     );
 
-    if (!definitionLocation) return;
+    if (!selectedParameter) return;
 
-    return {
-      uri: params.textDocument.uri,
-      range: definitionLocation,
-    };
+    const name = selectedParameter.token.content;
+
+    switch (selectedParameter.type) {
+      case ParameterType.variable:
+        return findVariableUsageLocations(name, doc.nodes).map((location) => ({
+          uri: params.textDocument.uri,
+          range: location,
+        }));
+      case ParameterType.label:
+        return findLabelReferences(name, doc.nodes).map((location) => ({
+          uri: params.textDocument.uri,
+          range: location,
+        }));
+    }
   });
 
   documents.onDidChangeContent((change) => {
