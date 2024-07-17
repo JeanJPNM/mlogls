@@ -91,11 +91,13 @@ export class LabelDeclaration extends SyntaxNode {
   type = "LabelDeclaration" as const;
   isInstruction = false;
 
+  nameToken: TextToken;
   name: string;
 
   constructor(line: TokenLine) {
     super(line);
 
+    this.nameToken = line.tokens[0];
     this.name = line.tokens[0].content.slice(0, -1);
   }
 
