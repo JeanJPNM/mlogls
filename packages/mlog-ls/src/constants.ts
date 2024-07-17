@@ -14,6 +14,8 @@ export const globalReadonlyVariables = [
   "@ctrlCommand",
 ];
 
+export const counterVar = "@counter";
+
 export const teams = [
   "@derelict",
   "@sharded",

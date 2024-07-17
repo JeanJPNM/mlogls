@@ -1,18 +1,12 @@
 import {
   CompletionItem,
-  CompletionItemKind,
   DiagnosticSeverity,
-  DiagnosticTag,
-  ParameterInformation,
   SignatureHelp,
-  SignatureInformation,
 } from "vscode-languageserver";
 import {
   CompletionContext,
   TokenSemanticData,
-  getActiveParameter,
   getTargetToken,
-  validateRestrictedToken,
 } from "../instructions";
 import {
   ParserDiagnostic,
@@ -21,8 +15,15 @@ import {
   TokenLine,
 } from "./tokenize";
 import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
-
-const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
+import {
+  createOverloadDescriptor,
+  createSingleDescriptor,
+  DataOf,
+  InstructionDescriptor,
+  InstructionParameter,
+  restrictedTokenCompletionKind,
+} from "./descriptors";
+import { counterVar } from "../constants";
 
 export abstract class SyntaxNode {
   abstract type: string;
@@ -103,11 +104,64 @@ export class LabelDeclaration extends SyntaxNode {
   }
 }
 
-export class NoopInstruction extends SyntaxNode {
+export abstract class InstructionNode<Data> extends SyntaxNode {
+  abstract descriptor: InstructionDescriptor<Data>;
+  constructor(
+    line: TokenLine,
+    public data: Data,
+    public parameters: InstructionParameter[]
+  ) {
+    super(line);
+  }
+
+  provideCompletionItems(
+    context: CompletionContext,
+    character: number
+  ): CompletionItem[] {
+    const targetToken = getTargetToken(character, this.line.tokens);
+
+    return this.descriptor.getCompletionItems(this.data, context, targetToken);
+  }
+
+  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
+    super.provideDiagnostics(diagnostics);
+    this.descriptor.provideDiagnostics(this.data, this.parameters, diagnostics);
+  }
+
+  provideTokenSemantics(tokens: TokenSemanticData[]): void {
+    this.descriptor.provideTokenSemantics(this.parameters, tokens);
+  }
+
+  provideSignatureHelp(character: number): SignatureHelp {
+    return {
+      activeParameter: this.descriptor.getActiveSignatureParameter(
+        this.data,
+        character,
+        this.line.tokens
+      ),
+      activeSignature: this.descriptor.getActiveSignature(this.data),
+      signatures: this.descriptor.getSignatures(),
+    };
+  }
+}
+
+export class NoopInstruction extends InstructionNode<
+  DataOf<typeof NoopInstruction>
+> {
   type = "NoopInstruction" as const;
 
-  constructor(line: TokenLine) {
-    super(line);
+  descriptor = NoopInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "noop",
+    descriptor: {},
+  });
+
+  static parse(line: TokenLine) {
+    return new NoopInstruction(
+      line,
+      ...NoopInstruction.descriptor.parse(line.tokens)
+    );
   }
 
   provideSignatureHelp(character: number): SignatureHelp {
@@ -123,11 +177,21 @@ export class NoopInstruction extends SyntaxNode {
 }
 
 /** Used to handle instrucions that this language server does not know */
-export class UnknownInstruction extends SyntaxNode {
+export class UnknownInstruction extends InstructionNode<
+  DataOf<typeof UnknownInstruction>
+> {
   type = "UnknownInstruction" as const;
 
-  constructor(line: TokenLine) {
-    super(line);
+  descriptor = UnknownInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "unknown",
+    descriptor: {},
+  });
+
+  static parse(line: TokenLine) {
+    const data = UnknownInstruction.descriptor.parse(line.tokens);
+    return new UnknownInstruction(line, ...data);
   }
 
   provideSignatureHelp(): SignatureHelp {
@@ -150,86 +214,63 @@ export class UnknownInstruction extends SyntaxNode {
   }
 }
 
-export class ReadInstruction extends SyntaxNode {
+export class ReadInstruction extends InstructionNode<
+  DataOf<typeof ReadInstruction>
+> {
   type = "ReadInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof ReadInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = RadarInstruction.descriptor;
 
-  static readonly descriptor = {
-    output: { isOutput: true },
-    target: {},
-    address: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "read",
+    descriptor: {
+      output: { isOutput: true },
+      target: {},
+      address: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(ReadInstruction.descriptor, line.tokens);
-
-    return new ReadInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      signatures: [getDescriptorSignature(ReadInstruction.descriptor, "read")],
-    };
+    return new ReadInstruction(
+      line,
+      ...ReadInstruction.descriptor.parse(line.tokens)
+    );
   }
 }
 
-export class WriteInstruction extends SyntaxNode {
+export class WriteInstruction extends InstructionNode<
+  DataOf<typeof WriteInstruction>
+> {
   type = "WriteInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof WriteInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = WriteInstruction.descriptor;
 
-  static readonly descriptor = {
-    input: {},
-    target: {},
-    address: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "write",
+    descriptor: {
+      input: {},
+      target: {},
+      address: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(WriteInstruction.descriptor, line.tokens);
-
-    return new WriteInstruction(line, data);
-  }
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      signatures: [
-        getDescriptorSignature(WriteInstruction.descriptor, "write"),
-      ],
-    };
+    return new WriteInstruction(
+      line,
+      ...WriteInstruction.descriptor.parse(line.tokens)
+    );
   }
 }
 
-export class DrawInstruction extends SyntaxNode {
+export class DrawInstruction extends InstructionNode<
+  DataOf<typeof DrawInstruction>
+> {
   type = "DrawInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: ReturnType<(typeof DrawInstruction.descriptor)["parse"]>
-  ) {
-    super(line);
-  }
+  descriptor = DrawInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "draw",
     overloads: {
       clear: {
         red: {},
@@ -319,264 +360,121 @@ export class DrawInstruction extends SyntaxNode {
   });
 
   static parse(line: TokenLine) {
-    const data = DrawInstruction.descriptor.parse(line.tokens);
-
-    return new DrawInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]) {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown draw type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-
-      return;
-    }
-
-    if (type === "print") {
-      validateMembers(
-        DrawInstruction.descriptor.overloads.print,
-        this.data,
-        diagnostics
-      );
-    }
-  }
-
-  provideCompletionItems(context: CompletionContext, character: number) {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return DrawInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
+    return new DrawInstruction(
+      line,
+      ...DrawInstruction.descriptor.parse(line.tokens)
     );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-    if (type === "print" && this.data.alignment) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: this.data.alignment,
-      });
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { type } = this.data;
-    const { descriptor } = DrawInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(type),
-      signatures: descriptor.getSignatures("draw"),
-    };
   }
 }
 
-export class PrintInstruction extends SyntaxNode {
+export class PrintInstruction extends InstructionNode<
+  DataOf<typeof PrintInstruction>
+> {
   type = "PrintInstruction" as const;
 
-  constructor(line: TokenLine, public value?: TextToken) {
-    super(line);
-  }
+  descriptor = PrintInstruction.descriptor;
 
-  static readonly descriptor = {
-    value: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "print",
+    descriptor: { value: {} },
+  });
 
   static parse(line: TokenLine) {
-    const { value } = parseDescriptor(PrintInstruction.descriptor, line.tokens);
+    const data = PrintInstruction.descriptor.parse(line.tokens);
 
-    return new PrintInstruction(line, value);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        { value: this.value },
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(PrintInstruction.descriptor, "print"),
-      ],
-    };
+    return new PrintInstruction(line, ...data);
   }
 }
 
-export class FormatInstruction extends SyntaxNode {
+export class FormatInstruction extends InstructionNode<
+  DataOf<typeof FormatInstruction>
+> {
   type = "FormatInstruction" as const;
-  constructor(line: TokenLine, public value?: TextToken) {
-    super(line);
-  }
 
-  static readonly descriptor = {
-    value: {},
-  } as const satisfies SingleDescriptor;
+  descriptor = FormatInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "format",
+    descriptor: { value: {} },
+  });
 
   static parse(line: TokenLine) {
-    const { value } = parseDescriptor(
-      FormatInstruction.descriptor,
-      line.tokens
-    );
-    return new FormatInstruction(line, value);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        { value: this.value },
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(FormatInstruction.descriptor, "format"),
-      ],
-    };
+    const data = FormatInstruction.descriptor.parse(line.tokens);
+    return new FormatInstruction(line, ...data);
   }
 }
 
-export class DrawFlushInstruction extends SyntaxNode {
+export class DrawFlushInstruction extends InstructionNode<
+  DataOf<typeof DrawFlushInstruction>
+> {
   type = "DrawFlushInstruction" as const;
 
-  constructor(line: TokenLine, public target?: TextToken) {
-    super(line);
-  }
+  descriptor = DrawFlushInstruction.descriptor;
 
-  static readonly descriptor = {
-    target: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "drawflush",
+    descriptor: { target: {} },
+  });
 
   static parse(line: TokenLine) {
-    const { target } = parseDescriptor(
-      DrawFlushInstruction.descriptor,
-      line.tokens
-    );
+    const data = DrawFlushInstruction.descriptor.parse(line.tokens);
 
-    return new DrawFlushInstruction(line, target);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        { target: this.target },
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(DrawFlushInstruction.descriptor, "drawflush"),
-      ],
-    };
+    return new DrawFlushInstruction(line, ...data);
   }
 }
 
-export class PrintFlushInstruction extends SyntaxNode {
+export class PrintFlushInstruction extends InstructionNode<
+  DataOf<typeof PrintFlushInstruction>
+> {
   type = "PrintFlushInstruction" as const;
 
-  constructor(line: TokenLine, public target?: TextToken) {
-    super(line);
-  }
+  descriptor = PrintFlushInstruction.descriptor;
 
-  static readonly descriptor = {
-    target: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "printflush",
+    descriptor: { target: {} },
+  });
 
   static parse(line: TokenLine) {
-    const { target } = parseDescriptor(
-      PrintFlushInstruction.descriptor,
-      line.tokens
+    return new PrintFlushInstruction(
+      line,
+      ...PrintFlushInstruction.descriptor.parse(line.tokens)
     );
-
-    return new PrintFlushInstruction(line, target);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        { target: this.target },
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(PrintFlushInstruction.descriptor, "printflush"),
-      ],
-    };
   }
 }
 
-export class GetLinkInstruction extends SyntaxNode {
+export class GetLinkInstruction extends InstructionNode<
+  DataOf<typeof GetLinkInstruction>
+> {
   type = "GetLinkInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public result?: TextToken,
-    public index?: TextToken
-  ) {
-    super(line);
-  }
+  descriptor = GetLinkInstruction.descriptor;
 
-  static readonly descriptor = {
-    result: { isOutput: true },
-    index: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "getlink",
+    descriptor: {
+      result: { isOutput: true },
+      index: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const { result, index } = parseDescriptor(
-      GetLinkInstruction.descriptor,
-      line.tokens
+    return new GetLinkInstruction(
+      line,
+      ...GetLinkInstruction.descriptor.parse(line.tokens)
     );
-
-    return new GetLinkInstruction(line, result, index);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        { result: this.result, index: this.index },
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(GetLinkInstruction.descriptor, "getlink"),
-      ],
-    };
   }
 }
 
-export class ControlInstruction extends SyntaxNode {
+export class ControlInstruction extends InstructionNode<
+  DataOf<typeof ControlInstruction>
+> {
   type = "ControlInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadData<typeof ControlInstruction.descriptor.overloads>
-  ) {
-    super(line);
-  }
+  descriptor = ControlInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "control",
     overloads: {
       enabled: { building: {}, enabled: {} },
       shoot: { building: {}, x: {}, y: {}, shoot: {} },
@@ -587,61 +485,10 @@ export class ControlInstruction extends SyntaxNode {
   });
 
   static parse(line: TokenLine) {
-    const data = ControlInstruction.descriptor.parse(line.tokens);
-
-    return new ControlInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown control type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    if (targetToken === this.data.typeToken) {
-      return overloadCompletionItems(ControlInstruction.descriptor.overloads);
-    }
-
-    return context.getVariableCompletions();
-  }
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { type } = this.data;
-
-    return {
-      activeParameter:
-        ControlInstruction.descriptor.getActiveSignatureParameter(
-          this.data,
-          character,
-          this.line.tokens
-        ),
-      activeSignature: ControlInstruction.descriptor.getActiveSignature(type),
-      signatures: ControlInstruction.descriptor.getSignatures("control"),
-    };
+    return new ControlInstruction(
+      line,
+      ...ControlInstruction.descriptor.parse(line.tokens)
+    );
   }
 }
 
@@ -664,192 +511,121 @@ const radarSorts = [
   "maxHealth",
 ] as const;
 
-export class RadarInstruction extends SyntaxNode {
+export class RadarInstruction extends InstructionNode<
+  DataOf<typeof RadarInstruction>
+> {
   type = "RadarInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof RadarInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = RadarInstruction.descriptor;
 
-  static readonly descriptor = {
-    filter1: {
-      restrict: {
-        invalidPrefix: "Invalid radar filter: ",
-        values: radarFilters,
+  static readonly descriptor = createSingleDescriptor({
+    name: "radar",
+    descriptor: {
+      filter1: {
+        restrict: {
+          invalidPrefix: "Invalid radar filter: ",
+          values: radarFilters,
+        },
       },
-    },
-    filter2: {
-      restrict: {
-        invalidPrefix: "Invalid radar filter: ",
-        values: radarFilters,
+      filter2: {
+        restrict: {
+          invalidPrefix: "Invalid radar filter: ",
+          values: radarFilters,
+        },
       },
-    },
-    filter3: {
-      restrict: {
-        invalidPrefix: "Invalid radar filter: ",
-        values: radarFilters,
+      filter3: {
+        restrict: {
+          invalidPrefix: "Invalid radar filter: ",
+          values: radarFilters,
+        },
       },
-    },
-    sort: {
-      restrict: {
-        invalidPrefix: "Invalid radar sort: ",
-        values: radarSorts,
+      sort: {
+        restrict: {
+          invalidPrefix: "Invalid radar sort: ",
+          values: radarSorts,
+        },
       },
+      building: {},
+      order: {},
+      output: { isOutput: true },
     },
-    building: {},
-    order: {},
-    output: { isOutput: true },
-  } as const satisfies SingleDescriptor;
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(RadarInstruction.descriptor, line.tokens);
+    const data = RadarInstruction.descriptor.parse(line.tokens);
 
-    return new RadarInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    validateRestrictedToken(
-      this.data.filter1,
-      radarFilters,
-      diagnostics,
-      RadarInstruction.descriptor.filter1.restrict.invalidPrefix
-    );
-
-    validateRestrictedToken(
-      this.data.filter2,
-      radarFilters,
-      diagnostics,
-      RadarInstruction.descriptor.filter2.restrict.invalidPrefix
-    );
-
-    validateRestrictedToken(
-      this.data.filter3,
-      radarFilters,
-      diagnostics,
-      RadarInstruction.descriptor.filter3.restrict.invalidPrefix
-    );
-
-    validateRestrictedToken(
-      this.data.sort,
-      radarSorts,
-      diagnostics,
-      RadarInstruction.descriptor.sort.restrict.invalidPrefix
-    );
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return provideMemberCompletions(
-      RadarInstruction.descriptor,
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      signatures: [
-        getDescriptorSignature(RadarInstruction.descriptor, "radar"),
-      ],
-    };
+    return new RadarInstruction(line, ...data);
   }
 }
 
-export class SensorInstruction extends SyntaxNode {
+export class SensorInstruction extends InstructionNode<
+  DataOf<typeof SensorInstruction>
+> {
   type = "SensorInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SensorInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SensorInstruction.descriptor;
 
-  static readonly descriptor = {
-    output: { isOutput: true },
-    target: {},
-    property: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "sensor",
+    descriptor: {
+      output: { isOutput: true },
+      target: {},
+      property: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SensorInstruction.descriptor, line.tokens);
-
-    return new SensorInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      signatures: [
-        getDescriptorSignature(SensorInstruction.descriptor, "sensor"),
-      ],
-    };
+    return new SensorInstruction(
+      line,
+      ...SensorInstruction.descriptor.parse(line.tokens)
+    );
   }
 }
 
-export class SetInstruction extends SyntaxNode {
+export class SetInstruction extends InstructionNode<
+  DataOf<typeof SetInstruction>
+> {
   type = "SetInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SetInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetInstruction.descriptor;
 
-  static readonly descriptor = {
-    variable: { isOutput: true },
-    value: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "set",
+    descriptor: {
+      variable: { isOutput: true },
+      value: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SetInstruction.descriptor, line.tokens);
+    const data = SetInstruction.descriptor.parse(line.tokens);
 
-    return new SetInstruction(line, data);
+    return new SetInstruction(line, ...data);
   }
 
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      signatures: [getDescriptorSignature(SetInstruction.descriptor, "set")],
-    };
+  provideTokenSemantics(tokens: TokenSemanticData[]): void {
+    // this tells the editor that this particular
+    // use of the set instruction affects the control flow
+    // just like jump
+    if (this.data.variable?.content === counterVar) {
+      tokens.push({
+        token: this.line.tokens[0],
+        type: TokenTypes.keyword,
+      });
+    }
+    super.provideTokenSemantics(tokens);
   }
 }
 
-export class OpInstruction extends SyntaxNode {
+export class OpInstruction extends InstructionNode<
+  DataOf<typeof OpInstruction>
+> {
   type = "OpInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadData<typeof OpInstruction.descriptor.overloads>
-  ) {
-    super(line);
-  }
+  descriptor = OpInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "op",
     overloads: {
       add: { result: { isOutput: true }, a: {}, b: {} },
       sub: { result: { isOutput: true }, a: {}, b: {} },
@@ -895,112 +671,67 @@ export class OpInstruction extends SyntaxNode {
   });
 
   static parse(line: TokenLine) {
-    const data = OpInstruction.descriptor.parse(line.tokens);
-
-    return new OpInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown op type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return OpInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
+    return new OpInstruction(
+      line,
+      ...OpInstruction.descriptor.parse(line.tokens)
     );
   }
 
   provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
+    // this tells the editor that this particular
+    // use of the set instruction affects the control flow
+    // just like jump
+    if (
+      this.data.type !== "unknown" &&
+      this.data.result?.content === counterVar
+    ) {
       tokens.push({
-        type: TokenTypes.operator,
-        token: typeToken,
+        token: this.line.tokens[0],
+        type: TokenTypes.keyword,
       });
     }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        OpInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { type } = this.data;
-    return {
-      activeParameter: OpInstruction.descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: OpInstruction.descriptor.getActiveSignature(type),
-      signatures: OpInstruction.descriptor.getSignatures("op"),
-    };
+    super.provideTokenSemantics(tokens);
   }
 }
 
-export class WaitInstruction extends SyntaxNode {
+export class WaitInstruction extends InstructionNode<
+  DataOf<typeof WaitInstruction>
+> {
   type = "WaitInstruction" as const;
 
-  constructor(line: TokenLine, public seconds?: TextToken) {
-    super(line);
-  }
+  descriptor = WaitInstruction.descriptor;
 
-  static readonly descriptor = {
-    seconds: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "wait",
+    descriptor: {
+      seconds: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const { seconds } = parseDescriptor(
-      WaitInstruction.descriptor,
-      line.tokens
-    );
+    const data = WaitInstruction.descriptor.parse(line.tokens);
 
-    return new WaitInstruction(line, seconds);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        { duration: this.seconds },
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [getDescriptorSignature(WaitInstruction.descriptor, "wait")],
-    };
+    return new WaitInstruction(line, ...data);
   }
 }
 
-export class StopInstruction extends SyntaxNode {
+export class StopInstruction extends InstructionNode<
+  DataOf<typeof StopInstruction>
+> {
   type = "StopInstruction" as const;
 
-  constructor(line: TokenLine) {
-    super(line);
-  }
+  descriptor = StopInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "stop",
+    descriptor: {},
+  });
 
   static parse(line: TokenLine) {
-    return new StopInstruction(line);
+    return new StopInstruction(
+      line,
+      ...StopInstruction.descriptor.parse(line.tokens)
+    );
   }
 
   provideSignatureHelp(character: number): SignatureHelp {
@@ -1016,17 +747,15 @@ export class StopInstruction extends SyntaxNode {
   }
 }
 
-export class LookupInstruction extends SyntaxNode {
+export class LookupInstruction extends InstructionNode<
+  DataOf<typeof LookupInstruction>
+> {
   type = "LookupInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadData<typeof LookupInstruction.descriptor.overloads>
-  ) {
-    super(line);
-  }
+  descriptor = LookupInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "lookup",
     overloads: {
       block: { result: { isOutput: true }, id: {} },
       unit: { result: { isOutput: true }, id: {} },
@@ -1036,85 +765,35 @@ export class LookupInstruction extends SyntaxNode {
   });
 
   static parse(line: TokenLine) {
-    const data = LookupInstruction.descriptor.parse(line.tokens);
-
-    return new LookupInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown lookup type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    if (targetToken === this.data.typeToken) {
-      return overloadCompletionItems(LookupInstruction.descriptor.overloads);
-    }
-
-    return context.getVariableCompletions();
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: LookupInstruction.descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: LookupInstruction.descriptor.getActiveSignature(
-        this.data.type
-      ),
-      signatures: LookupInstruction.descriptor.getSignatures("lookup"),
-    };
+    return new LookupInstruction(
+      line,
+      ...LookupInstruction.descriptor.parse(line.tokens)
+    );
   }
 }
 
-export class PackColorInstruction extends SyntaxNode {
+export class PackColorInstruction extends InstructionNode<
+  DataOf<typeof PackColorInstruction>
+> {
   type = "PackColorInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof PackColorInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = PackColorInstruction.descriptor;
 
-  static readonly descriptor = {
-    result: { isOutput: true },
-    red: {},
-    green: {},
-    blue: {},
-    alpha: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "packcolor",
+    descriptor: {
+      result: { isOutput: true },
+      red: {},
+      green: {},
+      blue: {},
+      alpha: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(PackColorInstruction.descriptor, line.tokens);
+    const data = PackColorInstruction.descriptor.parse(line.tokens);
 
-    return new PackColorInstruction(line, data);
+    return new PackColorInstruction(line, ...data);
   }
 
   provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
@@ -1153,57 +832,39 @@ export class PackColorInstruction extends SyntaxNode {
       }
     }
   }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(PackColorInstruction.descriptor, "packcolor"),
-      ],
-    };
-  }
 }
 
-export class EndInstruction extends SyntaxNode {
+export class EndInstruction extends InstructionNode<
+  DataOf<typeof EndInstruction>
+> {
   type = "EndInstruction" as const;
 
-  constructor(line: TokenLine) {
-    super(line);
-  }
+  descriptor = EndInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "end",
+    descriptor: {},
+  });
 
   static parse(line: TokenLine) {
-    return new EndInstruction(line);
-  }
-
-  provideSignatureHelp(): SignatureHelp {
-    return {
-      signatures: [
-        {
-          label: "end",
-        },
-      ],
-    };
+    return new EndInstruction(
+      line,
+      ...EndInstruction.descriptor.parse(line.tokens)
+    );
   }
 }
 
-export class JumpInstruction extends SyntaxNode {
+export class JumpInstruction extends InstructionNode<
+  DataOf<typeof JumpInstruction>
+> {
   type = "JumpInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof JumpInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = JumpInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "jump",
     pre: {
-      destination: {},
+      destination: { isLabel: true },
     },
     overloads: {
       equal: { x: {}, y: {} },
@@ -1220,23 +881,7 @@ export class JumpInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = JumpInstruction.descriptor.parse(line.tokens);
 
-    return new JumpInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown jump operation: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
+    return new JumpInstruction(line, ...data);
   }
 
   provideCompletionItems(
@@ -1249,93 +894,40 @@ export class JumpInstruction extends SyntaxNode {
       return context.getLabelCompletions();
     }
 
-    if (targetToken === this.data.typeToken) {
-      return overloadCompletionItems(JumpInstruction.descriptor.overloads);
-    }
-
-    return context.getVariableCompletions();
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { destination, typeToken } = this.data;
-
-    if (destination?.type === "identifier") {
-      tokens.push({
-        type: TokenTypes.function,
-        token: destination,
-      });
-    }
-
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      signatures: JumpInstruction.descriptor.getSignatures("jump"),
-      activeParameter: JumpInstruction.descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: JumpInstruction.descriptor.getActiveSignature(
-        this.data.type
-      ),
-    };
+    return super.provideCompletionItems(context, character);
   }
 }
 
-export class UnitBindInstruction extends SyntaxNode {
+export class UnitBindInstruction extends InstructionNode<
+  DataOf<typeof UnitBindInstruction>
+> {
   type = "UnitBindInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof UnitBindInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = UnitBindInstruction.descriptor;
 
-  static readonly descriptor = {
-    unit: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "ubind",
+    descriptor: {
+      unit: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(UnitBindInstruction.descriptor, line.tokens);
+    const data = UnitBindInstruction.descriptor.parse(line.tokens);
 
-    return new UnitBindInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      signatures: [
-        getDescriptorSignature(UnitBindInstruction.descriptor, "ubind"),
-      ],
-    };
+    return new UnitBindInstruction(line, ...data);
   }
 }
 
-export class UnitControlInstruction extends SyntaxNode {
+export class UnitControlInstruction extends InstructionNode<
+  DataOf<typeof UnitControlInstruction>
+> {
   type = "UnitControlInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<
-      typeof UnitControlInstruction.descriptor
-    >
-  ) {
-    super(line);
-  }
+  descriptor = UnitControlInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "ucontrol",
     overloads: {
       idle: {},
       stop: {},
@@ -1369,175 +961,54 @@ export class UnitControlInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = UnitControlInstruction.descriptor.parse(line.tokens);
 
-    return new UnitControlInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown unit control type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return UnitControlInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter:
-        UnitControlInstruction.descriptor.getActiveSignatureParameter(
-          this.data,
-          character,
-          this.line.tokens
-        ),
-      activeSignature: UnitControlInstruction.descriptor.getActiveSignature(
-        this.data.type
-      ),
-      signatures: UnitControlInstruction.descriptor.getSignatures("ucontrol"),
-    };
+    return new UnitControlInstruction(line, ...data);
   }
 }
 
-export class UnitRadarinstruction extends SyntaxNode {
+export class UnitRadarinstruction extends InstructionNode<
+  DataOf<typeof UnitRadarinstruction>
+> {
   type = "UnitRadarinstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof UnitRadarinstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = UnitRadarinstruction.descriptor;
 
-  static readonly descriptor = {
-    filter1: {
-      restrict: {
-        invalidPrefix: "Invalid radar filter: ",
-        values: radarFilters,
+  static readonly descriptor = createSingleDescriptor({
+    name: "uradar",
+    descriptor: {
+      filter1: {
+        restrict: {
+          invalidPrefix: "Invalid radar filter: ",
+          values: radarFilters,
+        },
       },
-    },
-    filter2: {
-      restrict: {
-        invalidPrefix: "Invalid radar filter: ",
-        values: radarFilters,
+      filter2: {
+        restrict: {
+          invalidPrefix: "Invalid radar filter: ",
+          values: radarFilters,
+        },
       },
-    },
-    filter3: {
-      restrict: {
-        invalidPrefix: "Invalid radar filter: ",
-        values: radarFilters,
+      filter3: {
+        restrict: {
+          invalidPrefix: "Invalid radar filter: ",
+          values: radarFilters,
+        },
       },
-    },
-    sort: {
-      restrict: {
-        invalidPrefix: "Invalid radar sort: ",
-        values: radarSorts,
+      sort: {
+        restrict: {
+          invalidPrefix: "Invalid radar sort: ",
+          values: radarSorts,
+        },
       },
+      _: {},
+      order: {},
+      output: { isOutput: true },
     },
-    _: {},
-    order: {},
-    output: { isOutput: true },
-  } as const satisfies SingleDescriptor;
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(UnitRadarinstruction.descriptor, line.tokens);
+    const data = UnitRadarinstruction.descriptor.parse(line.tokens);
 
-    return new UnitRadarinstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    validateMembers(UnitRadarinstruction.descriptor, this.data, diagnostics);
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    switch (targetToken) {
-      case this.data.filter1:
-      case this.data.filter2:
-      case this.data.filter3:
-        return radarFilters.map(
-          (value): CompletionItem => ({
-            label: value,
-            kind: restrictedTokenCompletionKind,
-          })
-        );
-      case this.data.sort:
-        return radarSorts.map(
-          (value): CompletionItem => ({
-            label: value,
-            kind: restrictedTokenCompletionKind,
-          })
-        );
-    }
-
-    return context.getVariableCompletions();
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { filter1, filter2, filter3, sort } = this.data;
-
-    for (const token of [filter1, filter2, filter3]) {
-      if (token) {
-        tokens.push({
-          type: TokenTypes.enumMember,
-          token,
-        });
-      }
-    }
-
-    if (sort) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: sort,
-      });
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      signatures: [
-        getDescriptorSignature(UnitRadarinstruction.descriptor, "uradar"),
-      ],
-    };
+    return new UnitRadarinstruction(line, ...data);
   }
 }
 
@@ -1552,17 +1023,15 @@ const unitLocateGroups = [
   "reactor",
 ];
 
-export class UnitLocateInstruction extends SyntaxNode {
+export class UnitLocateInstruction extends InstructionNode<
+  DataOf<typeof UnitLocateInstruction>
+> {
   type = "UnitLocateInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof UnitLocateInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = UnitLocateInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "ulocate",
     overloads: {
       ore: {
         _group: {
@@ -1625,89 +1094,19 @@ export class UnitLocateInstruction extends SyntaxNode {
 
   static parse(line: TokenLine) {
     const data = UnitLocateInstruction.descriptor.parse(line.tokens);
-    return new UnitLocateInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown unit locate type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-
-    if (type !== "unknown") {
-      validateMembers(
-        UnitLocateInstruction.descriptor.overloads[type],
-        this.data,
-        diagnostics
-      );
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return UnitLocateInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        UnitLocateInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = UnitLocateInstruction;
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("ulocate"),
-    };
+    return new UnitLocateInstruction(line, ...data);
   }
 }
 
-export class GetBlockInstruction extends SyntaxNode {
+export class GetBlockInstruction extends InstructionNode<
+  DataOf<typeof GetBlockInstruction>
+> {
   type = "GetBlockInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof GetBlockInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = GetBlockInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "getblock",
     overloads: {
       floor: {
         result: { isOutput: true },
@@ -1735,82 +1134,19 @@ export class GetBlockInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = GetBlockInstruction.descriptor.parse(line.tokens);
 
-    return new GetBlockInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown get block type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        GetBlockInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return GetBlockInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = GetBlockInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("getblock"),
-    };
+    return new GetBlockInstruction(line, ...data);
   }
 }
 
-export class SetBlockInstruction extends SyntaxNode {
+export class SetBlockInstruction extends InstructionNode<
+  DataOf<typeof SetBlockInstruction>
+> {
   type = "SetBlockInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof SetBlockInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetBlockInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "setblock",
     overloads: {
       floor: {
         to: {},
@@ -1835,178 +1171,77 @@ export class SetBlockInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = SetBlockInstruction.descriptor.parse(line.tokens);
 
-    return new SetBlockInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown set block type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return SetBlockInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = SetBlockInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("setblock"),
-    };
+    return new SetBlockInstruction(line, ...data);
   }
 }
 
-export class SpawnUnitInstruction extends SyntaxNode {
+export class SpawnUnitInstruction extends InstructionNode<
+  DataOf<typeof SpawnUnitInstruction>
+> {
   type = "SpawnUnitInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SpawnUnitInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SpawnUnitInstruction.descriptor;
 
-  static readonly descriptor = {
-    unitType: {},
-    x: {},
-    y: {},
-    rotation: {},
-    team: {},
-    result: { isOutput: true },
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "spawn",
+    descriptor: {
+      unitType: {},
+      x: {},
+      y: {},
+      rotation: {},
+      team: {},
+      result: { isOutput: true },
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SpawnUnitInstruction.descriptor, line.tokens);
+    const data = SpawnUnitInstruction.descriptor.parse(line.tokens);
 
-    return new SpawnUnitInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(SpawnUnitInstruction.descriptor, "spawn"),
-      ],
-    };
+    return new SpawnUnitInstruction(line, ...data);
   }
 }
 
-export class SenseWeatherInstruction extends SyntaxNode {
+export class SenseWeatherInstruction extends InstructionNode<
+  DataOf<typeof SenseWeatherInstruction>
+> {
   type = "SenseWeatherInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SenseWeatherInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SenseWeatherInstruction.descriptor;
 
-  static readonly descriptor = {
-    result: { isOutput: true },
-    weather: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "weathersense",
+    descriptor: {
+      result: { isOutput: true },
+      weather: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(
-      SenseWeatherInstruction.descriptor,
-      line.tokens
-    );
+    const data = SenseWeatherInstruction.descriptor.parse(line.tokens);
 
-    return new SenseWeatherInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(
-          SenseWeatherInstruction.descriptor,
-          "weathersense"
-        ),
-      ],
-    };
+    return new SenseWeatherInstruction(line, ...data);
   }
 }
 
-export class SetWeatherInstruction extends SyntaxNode {
+export class SetWeatherInstruction extends InstructionNode<
+  DataOf<typeof SetWeatherInstruction>
+> {
   type = "SetWeatherInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SetWeatherInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetWeatherInstruction.descriptor;
 
-  static readonly descriptor = {
-    weather: {},
-    active: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "weatherset",
+    descriptor: {
+      weather: {},
+      active: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SetWeatherInstruction.descriptor, line.tokens);
+    const data = SetWeatherInstruction.descriptor.parse(line.tokens);
 
-    return new SetWeatherInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(SetWeatherInstruction.descriptor, "weatherset"),
-      ],
-    };
+    return new SetWeatherInstruction(line, ...data);
   }
 }
 
@@ -2035,19 +1270,15 @@ const applyStatusEffects = [
   "overdrive",
 ] as const;
 
-export class ApplyStatusInstruction extends SyntaxNode {
+export class ApplyStatusInstruction extends InstructionNode<
+  DataOf<typeof ApplyStatusInstruction>
+> {
   type = "ApplyStatusInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<
-      typeof ApplyStatusInstruction.descriptor
-    >
-  ) {
-    super(line);
-  }
+  descriptor = ApplyStatusInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "status",
     overloads: {
       // clear status effect
       true: {
@@ -2077,90 +1308,19 @@ export class ApplyStatusInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = ApplyStatusInstruction.descriptor.parse(line.tokens);
 
-    return new ApplyStatusInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown apply status type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-
-    if (type !== "unknown") {
-      validateMembers(
-        ApplyStatusInstruction.descriptor.overloads[type],
-        this.data,
-        diagnostics
-      );
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return ApplyStatusInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        ApplyStatusInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = ApplyStatusInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("status"),
-    };
+    return new ApplyStatusInstruction(line, ...data);
   }
 }
 
-export class SpawnWaveInstruction extends SyntaxNode {
+export class SpawnWaveInstruction extends InstructionNode<
+  DataOf<typeof SpawnWaveInstruction>
+> {
   type = "SpawnWaveInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof SpawnWaveInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SpawnWaveInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "spawnwave",
     overloads: {
       // natural wave
       true: {},
@@ -2175,82 +1335,19 @@ export class SpawnWaveInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = SpawnWaveInstruction.descriptor.parse(line.tokens);
 
-    return new SpawnWaveInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown spawn wave type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return SpawnWaveInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        SpawnWaveInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = SpawnWaveInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("spawnwave"),
-    };
+    return new SpawnWaveInstruction(line, ...data);
   }
 }
 
-export class SetRuleInstruction extends SyntaxNode {
+export class SetRuleInstruction extends InstructionNode<
+  DataOf<typeof SetRuleInstruction>
+> {
   type = "SetRuleInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof SetRuleInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetRuleInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "setrule",
     overloads: {
       currentWaveTime: {
         seconds: {},
@@ -2342,92 +1439,19 @@ export class SetRuleInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = SetRuleInstruction.descriptor.parse(line.tokens);
 
-    return new SetRuleInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown setrule type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-
-    if (type !== "unknown") {
-      validateMembers(
-        SetRuleInstruction.descriptor.overloads[type],
-        this.data,
-        diagnostics
-      );
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return SetRuleInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        SetRuleInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = SetRuleInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("setrule"),
-    };
+    return new SetRuleInstruction(line, ...data);
   }
 }
 
-export class FlushMessageInstruction extends SyntaxNode {
+export class FlushMessageInstruction extends InstructionNode<
+  DataOf<typeof FlushMessageInstruction>
+> {
   type = "FlushMessageInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<
-      typeof FlushMessageInstruction.descriptor
-    >
-  ) {
-    super(line);
-  }
+  descriptor = FlushMessageInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "message",
     overloads: {
       notify: {
         _: {},
@@ -2445,90 +1469,23 @@ export class FlushMessageInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = FlushMessageInstruction.descriptor.parse(line.tokens);
 
-    return new FlushMessageInstruction(line, data);
+    return new FlushMessageInstruction(line, ...data);
   }
 
   provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
     super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown flush message type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-
-    if (type !== "unknown") {
-      validateMembers(
-        FlushMessageInstruction.descriptor.overloads[type],
-        this.data,
-        diagnostics
-      );
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return FlushMessageInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        FlushMessageInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = FlushMessageInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("message"),
-    };
   }
 }
 
-export class CutsceneInstruction extends SyntaxNode {
+export class CutsceneInstruction extends InstructionNode<
+  DataOf<typeof CutsceneInstruction>
+> {
   type = "CutsceneInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof CutsceneInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = CutsceneInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "cutscene",
     overloads: {
       pan: {
         x: {},
@@ -2545,82 +1502,19 @@ export class CutsceneInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = CutsceneInstruction.descriptor.parse(line.tokens);
 
-    return new CutsceneInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown cutscene type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return CutsceneInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        CutsceneInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = CutsceneInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("cutscene"),
-    };
+    return new CutsceneInstruction(line, ...data);
   }
 }
 
-export class EffectInstruction extends SyntaxNode {
+export class EffectInstruction extends InstructionNode<
+  DataOf<typeof EffectInstruction>
+> {
   type = "EffectInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof EffectInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = EffectInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "effect",
     overloads: {
       warn: {
         x: {},
@@ -2810,168 +1704,69 @@ export class EffectInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = EffectInstruction.descriptor.parse(line.tokens);
 
-    return new EffectInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown effect: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-
-    if (type !== "unknown") {
-      validateMembers(
-        EffectInstruction.descriptor.overloads[type],
-        this.data,
-        diagnostics
-      );
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return EffectInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        EffectInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = EffectInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("effect"),
-    };
+    return new EffectInstruction(line, ...data);
   }
 }
 
-export class ExplosionInstruction extends SyntaxNode {
+export class ExplosionInstruction extends InstructionNode<
+  DataOf<typeof ExplosionInstruction>
+> {
   type = "ExplosionInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof ExplosionInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = ExplosionInstruction.descriptor;
 
-  static readonly descriptor = {
-    team: {},
-    x: {},
-    y: {},
-    radius: {},
-    damage: {},
-    air: {},
-    ground: {},
-    pierce: {},
-    effect: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "explosion",
+    descriptor: {
+      team: {},
+      x: {},
+      y: {},
+      radius: {},
+      damage: {},
+      air: {},
+      ground: {},
+      pierce: {},
+      effect: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(ExplosionInstruction.descriptor, line.tokens);
+    const data = ExplosionInstruction.descriptor.parse(line.tokens);
 
-    return new ExplosionInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(ExplosionInstruction.descriptor, "explosion"),
-      ],
-    };
+    return new ExplosionInstruction(line, ...data);
   }
 }
 
-export class SetRateInstruction extends SyntaxNode {
+export class SetRateInstruction extends InstructionNode<
+  DataOf<typeof SetRateInstruction>
+> {
   type = "SetRateInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SetRateInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetRateInstruction.descriptor;
 
-  static readonly descriptor = {
-    rate: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "setrate",
+    descriptor: {
+      rate: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SetRateInstruction.descriptor, line.tokens);
+    const data = SetRateInstruction.descriptor.parse(line.tokens);
 
-    return new SetRateInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(SetRateInstruction.descriptor, "setrate"),
-      ],
-    };
+    return new SetRateInstruction(line, ...data);
   }
 }
 
-export class FetchInstruction extends SyntaxNode {
+export class FetchInstruction extends InstructionNode<
+  DataOf<typeof FetchInstruction>
+> {
   type = "FetchInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof FetchInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = FetchInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "fetch",
     overloads: {
       unit: {
         result: { isOutput: true },
@@ -3021,232 +1816,107 @@ export class FetchInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = FetchInstruction.descriptor.parse(line.tokens);
 
-    return new FetchInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown fetch type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-
-    if (type !== "unknown") {
-      validateMembers(
-        FetchInstruction.descriptor.overloads[type],
-        this.data,
-        diagnostics
-      );
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return FetchInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        FetchInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = FetchInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("fetch"),
-    };
+    return new FetchInstruction(line, ...data);
   }
 }
 
-export class SyncInstruction extends SyntaxNode {
+export class SyncInstruction extends InstructionNode<
+  DataOf<typeof SyncInstruction>
+> {
   type = "SyncInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SyncInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SyncInstruction.descriptor;
 
-  static readonly descriptor = {
-    variable: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "sync",
+    descriptor: {
+      variable: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SyncInstruction.descriptor, line.tokens);
+    const data = SyncInstruction.descriptor.parse(line.tokens);
 
-    return new SyncInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [getDescriptorSignature(SyncInstruction.descriptor, "sync")],
-    };
+    return new SyncInstruction(line, ...data);
   }
 }
 
-export class GetFlagInstruction extends SyntaxNode {
+export class GetFlagInstruction extends InstructionNode<
+  DataOf<typeof GetFlagInstruction>
+> {
   type = "GetFlagInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof GetFlagInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = GetFlagInstruction.descriptor;
 
-  static readonly descriptor = {
-    output: { isOutput: true },
-    flagName: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "getflag",
+    descriptor: {
+      output: { isOutput: true },
+      flagName: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(GetFlagInstruction.descriptor, line.tokens);
+    const data = GetFlagInstruction.descriptor.parse(line.tokens);
 
-    return new GetFlagInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(GetFlagInstruction.descriptor, "getflag"),
-      ],
-    };
+    return new GetFlagInstruction(line, ...data);
   }
 }
 
-export class SetFlagInstruction extends SyntaxNode {
+export class SetFlagInstruction extends InstructionNode<
+  DataOf<typeof SetFlagInstruction>
+> {
   type = "SetFlagInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SetFlagInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetFlagInstruction.descriptor;
 
-  static readonly descriptor = {
-    flagName: {},
-    enabled: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "setflag",
+    descriptor: {
+      flagName: {},
+      enabled: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SetFlagInstruction.descriptor, line.tokens);
+    const data = SetFlagInstruction.descriptor.parse(line.tokens);
 
-    return new SetFlagInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(SetFlagInstruction.descriptor, "getflag"),
-      ],
-    };
+    return new SetFlagInstruction(line, ...data);
   }
 }
 
-export class SetPropInstruction extends SyntaxNode {
+export class SetPropInstruction extends InstructionNode<
+  DataOf<typeof SetPropInstruction>
+> {
   type = "SetPropInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof SetPropInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetPropInstruction.descriptor;
 
-  static readonly descriptor = {
-    property: {},
-    target: {},
-    value: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "setprop",
+    descriptor: {
+      property: {},
+      target: {},
+      value: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(SetPropInstruction.descriptor, line.tokens);
+    const data = SetPropInstruction.descriptor.parse(line.tokens);
 
-    return new SetPropInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(SetPropInstruction.descriptor, "setprop"),
-      ],
-    };
+    return new SetPropInstruction(line, ...data);
   }
 }
 
-export class SetMarkerInstruction extends SyntaxNode {
+export class SetMarkerInstruction extends InstructionNode<
+  DataOf<typeof SetMarkerInstruction>
+> {
   type = "SetMarkerInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof SetMarkerInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = SetMarkerInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "setmarker",
     overloads: {
       remove: { id: {} },
       world: { id: {}, bool: {} },
@@ -3275,82 +1945,19 @@ export class SetMarkerInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = SetMarkerInstruction.descriptor.parse(line.tokens);
 
-    return new SetMarkerInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown setmarker type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return SetMarkerInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        SetMarkerInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = SetMarkerInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("setmarker"),
-    };
+    return new SetMarkerInstruction(line, ...data);
   }
 }
 
-export class MakeMakerInstruction extends SyntaxNode {
+export class MakeMakerInstruction extends InstructionNode<
+  DataOf<typeof MakeMakerInstruction>
+> {
   type = "MakeMakerInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: OverloadDescriptorData<typeof MakeMakerInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = MakeMakerInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
+    name: "makemarker",
     overloads: {
       shapeText: { id: {}, x: {}, y: {}, replace: {} },
       point: { id: {}, x: {}, y: {}, replace: {} },
@@ -3365,114 +1972,33 @@ export class MakeMakerInstruction extends SyntaxNode {
   static parse(line: TokenLine) {
     const data = MakeMakerInstruction.descriptor.parse(line.tokens);
 
-    return new MakeMakerInstruction(line, data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-
-    const { type, typeToken } = this.data;
-
-    if (type === "unknown" && typeToken) {
-      diagnostics.push({
-        message: `Unknown makemarker type: ${typeToken.content}`,
-        start: typeToken.start,
-        end: typeToken.end,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.unknownVariant,
-      });
-    }
-  }
-
-  provideCompletionItems(
-    context: CompletionContext,
-    character: number
-  ): CompletionItem[] {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    return MakeMakerInstruction.descriptor.getCompletionItems(
-      this.data,
-      context,
-      targetToken
-    );
-  }
-
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    const { type, typeToken } = this.data;
-    if (typeToken) {
-      tokens.push({
-        type: TokenTypes.enumMember,
-        token: typeToken,
-      });
-    }
-
-    if (type !== "unknown") {
-      provideMemberSemantics(
-        MakeMakerInstruction.descriptor.overloads[type],
-        this.data,
-        tokens
-      );
-    }
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const { descriptor } = MakeMakerInstruction;
-
-    return {
-      activeParameter: descriptor.getActiveSignatureParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: descriptor.getActiveSignature(this.data.type),
-      signatures: descriptor.getSignatures("makemarker"),
-    };
+    return new MakeMakerInstruction(line, ...data);
   }
 }
 
-export class PrintLocaleInstruction extends SyntaxNode {
+export class PrintLocaleInstruction extends InstructionNode<
+  DataOf<typeof PrintLocaleInstruction>
+> {
   type = "PrintLocaleInstruction" as const;
 
-  constructor(
-    line: TokenLine,
-    public data: DescriptorData<typeof PrintLocaleInstruction.descriptor>
-  ) {
-    super(line);
-  }
+  descriptor = PrintLocaleInstruction.descriptor;
 
-  static readonly descriptor = {
-    key: {},
-  } as const satisfies SingleDescriptor;
+  static readonly descriptor = createSingleDescriptor({
+    name: "printlocale",
+    descriptor: {
+      key: {},
+    },
+  });
 
   static parse(line: TokenLine) {
-    const data = parseDescriptor(
-      PrintLocaleInstruction.descriptor,
-      line.tokens
-    );
+    const data = PrintLocaleInstruction.descriptor.parse(line.tokens);
 
-    return new PrintLocaleInstruction(line, data);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    return {
-      activeParameter: getActiveParameter(
-        this.data,
-        character,
-        this.line.tokens
-      ),
-      activeSignature: 0,
-      signatures: [
-        getDescriptorSignature(
-          PrintLocaleInstruction.descriptor,
-          "printlocale"
-        ),
-      ],
-    };
+    return new PrintLocaleInstruction(line, ...data);
   }
 }
 
 const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
-  noop: (line) => new NoopInstruction(line),
+  noop: NoopInstruction.parse,
   read: ReadInstruction.parse,
   write: WriteInstruction.parse,
   draw: DrawInstruction.parse,
@@ -3519,173 +2045,13 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   printlocale: PrintLocaleInstruction.parse,
 };
 
-interface ParameterDescriptor {
-  name: string;
-  isOutput?: boolean;
-  restrict?: {
-    semanticType?: number;
-    invalidPrefix: string;
-    values: readonly string[];
-  };
-}
-
-function parseDescriptor<const T extends SingleDescriptor>(
-  descriptor: T,
-  tokens: TextToken[],
-  offset = 1
-): DescriptorData<T> {
-  const data: DescriptorData<T> = {};
-
-  let key: keyof T;
-  let i = 0;
-  for (key in descriptor) {
-    const token = tokens[i + offset];
-    data[key] = token?.isComment ? undefined : token;
-    i++;
-  }
-
-  return data;
-}
-
-type SingleDescriptor = Record<string, Omit<ParameterDescriptor, "name">>;
-type OverloadDescriptor = Record<string, SingleDescriptor>;
-
-type DescriptorData<T extends SingleDescriptor> = Partial<
-  Record<keyof T, TextToken>
->;
-
-type OverloadData<
-  T extends Record<string, SingleDescriptor>,
-  Pre extends SingleDescriptor = {}
-> =
-  | {
-      [K in keyof T]: DescriptorData<Pre> &
-        DescriptorData<T[K]> & {
-          type: K;
-          typeToken: TextToken;
-        };
-    }[keyof T]
-  | (DescriptorData<Pre> & { type: "unknown"; typeToken?: TextToken });
-
-type OverloadDescriptorData<
-  T extends { pre: SingleDescriptor; overloads: OverloadDescriptor }
-> = OverloadData<T["overloads"], T["pre"]>;
-
 function tokenToNumber(token: TextToken) {
   if (token.type !== "number") return undefined;
   return Number(token.content);
 }
 
-function overloadCompletionItems<const T extends Record<string, unknown>>(
-  descriptor: T
-) {
-  return Object.keys(descriptor).map(
-    (type): CompletionItem => ({
-      label: type,
-      kind: restrictedTokenCompletionKind,
-    })
-  );
-}
-
-function getDescriptorSignature<const T extends SingleDescriptor>(
-  descriptor: T,
-  prefix: string
-): SignatureInformation {
-  let label = prefix;
-
-  for (const key in descriptor) {
-    label += ` <${key}>`;
-  }
-  return {
-    label,
-    parameters: Object.keys(descriptor).map((key) => ({ label: `<${key}>` })),
-  };
-}
-
 export function getInstructionNames() {
   return Object.keys(instructionParsers);
-}
-
-function validateMembers<T extends SingleDescriptor>(
-  descriptor: T,
-  data: DescriptorData<T>,
-  diagnostics: ParserDiagnostic[]
-) {
-  for (const key in descriptor) {
-    const token = data[key];
-    if (!token) break;
-    const param = descriptor[key];
-    const isIgnored = key.startsWith("_");
-
-    if (param.restrict) {
-      validateRestrictedToken(
-        token,
-        param.restrict.values,
-        diagnostics,
-        param.restrict.invalidPrefix
-      );
-    } else if (isIgnored && token.content !== "_") {
-      diagnostics.push({
-        start: token.start,
-        end: token.end,
-        message: `This parameter is ignored by this instruction. Replace it with an underscore.`,
-        severity: DiagnosticSeverity.Warning,
-        code: DiagnosticCode.ignoredValue,
-        tags: [DiagnosticTag.Unnecessary],
-      });
-    }
-  }
-}
-
-function provideMemberSemantics<T extends SingleDescriptor>(
-  descriptor: T,
-  data: DescriptorData<T>,
-  tokens: TokenSemanticData[]
-) {
-  for (const key in descriptor) {
-    const token = data[key];
-    if (!token) break;
-    const param = descriptor[key];
-
-    if (param.restrict) {
-      tokens.push({
-        type: param.restrict.semanticType ?? TokenTypes.enumMember,
-        token,
-      });
-    } else if (token.type === "identifier" && token.content.startsWith("@")) {
-      tokens.push({
-        type: TokenTypes.variable,
-        modifiers: TokenModifiers.readonly,
-        token,
-      });
-    }
-  }
-}
-
-function provideMemberCompletions<T extends SingleDescriptor>(
-  descriptor: T,
-  data: DescriptorData<T>,
-  context: CompletionContext,
-  targetToken: TextToken | undefined
-) {
-  for (const key in descriptor) {
-    const value = data[key];
-
-    if (value !== targetToken) continue;
-
-    const param = descriptor[key];
-
-    if (!param.restrict) return context.getVariableCompletions();
-
-    return param.restrict.values.map(
-      (value): CompletionItem => ({
-        label: value,
-        kind: restrictedTokenCompletionKind,
-      })
-    );
-  }
-
-  return context.getVariableCompletions();
 }
 
 function parseLine(line: TokenLine) {
@@ -3697,7 +2063,7 @@ function parseLine(line: TokenLine) {
   const parse = instructionParsers[first.content];
   if (parse) return parse(line);
 
-  return new UnknownInstruction(line);
+  return UnknownInstruction.parse(line);
 }
 
 export function getSyntaxNodes(lines: TokenLine[]) {
@@ -3707,122 +2073,4 @@ export function getSyntaxNodes(lines: TokenLine[]) {
   }
 
   return nodes;
-}
-
-function createOverloadDescriptor<
-  const T extends OverloadDescriptor,
-  const Pre extends SingleDescriptor = {}
->({ pre, overloads }: { pre?: Pre; overloads: T }) {
-  const preKeys = pre ? Object.keys(pre) : [];
-  const typeTokenIndex = preKeys.length + 1;
-
-  return {
-    pre: pre ?? ({} as Pre),
-    overloads,
-    parse(tokens: TextToken[]): OverloadData<T, Pre> {
-      const preData = pre
-        ? parseDescriptor(pre, tokens)
-        : ({} as any as DescriptorData<Pre>);
-
-      const typeToken = tokens[typeTokenIndex];
-
-      if (tokens.length > typeTokenIndex) {
-        let key: keyof T;
-        for (key in overloads) {
-          const params = overloads[key];
-          if (typeToken.content !== key) continue;
-
-          return {
-            ...preData,
-            ...parseDescriptor(params, tokens, typeTokenIndex + 1),
-            type: key,
-            typeToken,
-          };
-        }
-      }
-
-      return { ...preData, type: "unknown", typeToken };
-    },
-
-    getSignatures(prefix: string): SignatureInformation[] {
-      let params: ParameterInformation[] = [];
-      if (pre) {
-        const signature = getDescriptorSignature(pre, prefix);
-        prefix = signature.label;
-        params = signature.parameters ?? [];
-      }
-
-      return Object.keys(overloads).map((key) => {
-        const signature = getDescriptorSignature(
-          overloads[key],
-          `${prefix} ${key}`
-        );
-        return {
-          ...signature,
-          parameters: [...params, ...signature.parameters!],
-        };
-      });
-    },
-    getActiveSignature(key: string): number {
-      let i = 0;
-      for (let current in overloads) {
-        if (current === key) return i;
-        i++;
-      }
-
-      return 0;
-    },
-    getActiveSignatureParameter(
-      data: OverloadData<T, Pre>,
-      character: number,
-      tokens: TextToken[]
-    ): number {
-      const targetToken = getTargetToken(character, tokens);
-      if (data.type === "unknown" && preKeys.length === 0) return -1;
-
-      const keys = [...preKeys];
-
-      if (data.type !== "unknown") {
-        const parameters = overloads[data.type];
-        keys.push(...Object.keys(parameters));
-      }
-
-      let i = 0;
-      for (const key of keys) {
-        if (targetToken === data[key as never]) return i;
-        i++;
-      }
-
-      return -1;
-    },
-    getCompletionItems(
-      data: OverloadData<T, Pre>,
-      context: CompletionContext,
-      targetToken: TextToken | undefined
-    ) {
-      if (targetToken === data.typeToken) {
-        return overloadCompletionItems(overloads);
-      }
-
-      for (const key in data) {
-        const value = data[key];
-        if (typeof value === "string") continue;
-
-        if (value !== targetToken) continue;
-
-        const param = pre?.[key] ?? overloads[data.type][key];
-
-        if (!param.restrict) return context.getVariableCompletions();
-
-        return param.restrict.values.map(
-          (value): CompletionItem => ({
-            label: value,
-            kind: restrictedTokenCompletionKind,
-          })
-        );
-      }
-
-      return context.getVariableCompletions();
-    },
-  };
 }

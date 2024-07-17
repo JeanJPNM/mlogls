@@ -58,6 +58,7 @@ export enum DiagnosticCode {
   lineTooLong = "line-too-long",
   unknownInstruction = "unknown-instruction",
   unknownVariant = "unknown-variant",
+  unusedParameter = "unused-parameter",
 }
 
 type TokenLegend<K extends string> = Record<K, number> & { keys: K[] };
