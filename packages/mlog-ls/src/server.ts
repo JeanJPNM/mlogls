@@ -115,6 +115,9 @@ export function startServer(options: LanguageServerOptions) {
         },
         definitionProvider: true,
         referencesProvider: true,
+        renameProvider: {
+          prepareProvider: true,
+        },
       },
     };
 
@@ -439,7 +442,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (!selectedParameter) return;
+    if (selectedParameter?.token.type !== "identifier") return;
 
     const name = selectedParameter.token.content;
 
@@ -487,7 +490,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (!selectedParameter) return;
+    if (selectedParameter?.token.type !== "identifier") return;
 
     const name = selectedParameter.token.content;
 
@@ -502,6 +505,105 @@ export function startServer(options: LanguageServerOptions) {
           uri: params.textDocument.uri,
           range: location,
         }));
+    }
+  });
+
+  connection.onRenameRequest((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return;
+
+    const { position, newName } = params;
+
+    const node = getSelectedSyntaxNode(doc, position);
+
+    if (
+      node instanceof LabelDeclaration &&
+      containsPosition(node.nameToken, position)
+    ) {
+      const locations = findLabelReferences(node.name, doc.nodes);
+
+      return {
+        changes: {
+          [params.textDocument.uri]: locations.map((location) => ({
+            range: location,
+            newText: newName,
+          })),
+        },
+      };
+    }
+
+    if (!(node instanceof InstructionNode)) return;
+
+    const selectedParameter = node.parameters.find((param) =>
+      containsPosition(param.token, position)
+    );
+
+    if (selectedParameter?.token.type !== "identifier") return;
+
+    const name = selectedParameter.token.content;
+
+    switch (selectedParameter.type) {
+      case ParameterType.variable:
+        const locations = findVariableUsageLocations(name, doc.nodes);
+
+        return {
+          changes: {
+            [params.textDocument.uri]: locations.map((location) => ({
+              range: location,
+              newText: newName,
+            })),
+          },
+        };
+      case ParameterType.label:
+        const labelReferences = findLabelReferences(name, doc.nodes);
+
+        return {
+          changes: {
+            [params.textDocument.uri]: labelReferences.map((location) => ({
+              range: location,
+              newText: newName,
+            })),
+          },
+        };
+    }
+  });
+
+  connection.onPrepareRename((params) => {
+    // TODO: prevent renaming of built-in globals
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return;
+
+    const { position } = params;
+
+    const node = getSelectedSyntaxNode(doc, position);
+
+    if (
+      node instanceof LabelDeclaration &&
+      containsPosition(node.nameToken, position)
+    ) {
+      return {
+        range: labelDeclarationNameRange(node.nameToken),
+        placeholder: node.name,
+      };
+    }
+
+    if (!(node instanceof InstructionNode)) return;
+
+    const selectedParameter = node.parameters.find((param) =>
+      containsPosition(param.token, position)
+    );
+
+    if (selectedParameter?.token.type !== "identifier") return;
+
+    const name = selectedParameter.token.content;
+
+    switch (selectedParameter.type) {
+      case ParameterType.variable:
+      case ParameterType.label:
+        return {
+          range: selectedParameter.token,
+          placeholder: name,
+        };
     }
   });
 
