@@ -15,6 +15,8 @@ import {
   CodeAction,
   CodeActionKind,
   TextDocumentIdentifier,
+  DocumentSymbol,
+  SymbolKind,
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
@@ -25,6 +27,7 @@ import {
   InstructionNode,
   JumpInstruction,
   LabelDeclaration,
+  PackColorInstruction,
   getInstructionNames,
 } from "./parser/nodes";
 import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
@@ -39,7 +42,7 @@ import {
   labelDeclarationNameRange,
   TokenSemanticData,
 } from "./analysis";
-import { ParameterType } from "./parser/descriptors";
+import { ParameterType, ParameterUsage } from "./parser/descriptors";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -118,6 +121,7 @@ export function startServer(options: LanguageServerOptions) {
         renameProvider: {
           prepareProvider: true,
         },
+        documentSymbolProvider: true,
       },
     };
 
@@ -300,6 +304,8 @@ export function startServer(options: LanguageServerOptions) {
           })
         );
       },
+      // TODO: only give completions for labels
+      // accessible in the current "scope"
       getLabelCompletions() {
         return [...findLabels(doc.nodes)].map((label) => ({
           label,
@@ -611,7 +617,92 @@ export function startServer(options: LanguageServerOptions) {
     }
   });
 
+  connection.onDocumentSymbol((params) => {
+    // TODO: add support for nested labels
+    // TODO: make nesting logic consistent with formatting
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return [];
+
+    const { nodes } = doc;
+    const symbols: DocumentSymbol[] = [];
+
+    let i = 0;
+
+    while (i < nodes.length) {
+      const node = nodes[i];
+      if (node instanceof LabelDeclaration) break;
+
+      i++;
+      if (!(node instanceof InstructionNode)) continue;
+
+      for (const param of node.parameters) {
+        if (
+          param.type === ParameterType.variable &&
+          param.usage === ParameterUsage.write
+        ) {
+          symbols.push({
+            name: param.token.content,
+            kind: SymbolKind.Variable,
+            range: param.token,
+            selectionRange: param.token,
+          });
+        }
+      }
+    }
+
+    while (i < nodes.length) {
+      const node = nodes[i];
+
+      if (!(node instanceof LabelDeclaration)) {
+        i++;
+        continue;
+      }
+
+      const start = node.start;
+      let end = node.end;
+      const children: DocumentSymbol[] = [];
+
+      // finds every instruction between this and the next label
+      // and adds the variables written by them as children
+      i++;
+      while (i < nodes.length) {
+        const current = nodes[i];
+        if (current instanceof LabelDeclaration) break;
+        i++;
+
+        if (!(current instanceof InstructionNode)) continue;
+
+        end = current.end;
+        for (const parameter of current.parameters) {
+          if (
+            parameter.type === ParameterType.variable &&
+            parameter.usage === ParameterUsage.write
+          ) {
+            children.push({
+              name: parameter.token.content,
+              kind: SymbolKind.Variable,
+              range: parameter.token,
+              selectionRange: parameter.token,
+            });
+          }
+        }
+      }
+
+      symbols.push({
+        name: node.name,
+        kind: SymbolKind.Function,
+        range: Range.create(start, end),
+        selectionRange: labelDeclarationNameRange(node.nameToken),
+        children,
+      });
+    }
+
+    return symbols;
+  });
+
   documents.onDidChangeContent((change) => {
+    // TODO: add diagnostics for unused labels
+    // TODO: add diagnostics for unused variables (script-wide)
     const doc = documents.get(change.document.uri);
     if (!doc) return;
 
