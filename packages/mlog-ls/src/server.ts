@@ -180,36 +180,40 @@ export function startServer(options: LanguageServerOptions) {
     const doc = documents.get(params.textDocument.uri);
     if (!doc) return [];
 
-    const lines = doc.lines;
+    const { nodes } = doc;
     const colors: ColorInformation[] = [];
 
-    for (const line of lines) {
-      if (line.tokens[0].content === "packcolor" && line.tokens.length > 2) {
-        const red = Number(line.tokens[2].content);
-        const green = Number(line.tokens[3]?.content) || 0;
-        const blue = Number(line.tokens[4]?.content) || 0;
-        const alpha = Number(line.tokens[5]?.content) || 1;
+    for (const node of nodes) {
+      if (node instanceof PackColorInstruction) {
+        const { red, green, blue, alpha } = node.data;
+        if (!red) continue;
+        if (green && !green.isNumber) continue;
+        if (blue && !blue.isNumber) continue;
+        if (alpha && !alpha.isNumber) continue;
+
+        const last = alpha ?? blue ?? green ?? red;
 
         colors.push({
-          color: { red, green, blue, alpha },
-          range: Range.create(
-            line.tokens[2].start,
-            line.tokens[5]?.end ?? line.end
-          ),
+          color: {
+            red: Number(red?.content) || 0,
+            green: Number(green?.content) || 0,
+            blue: Number(blue?.content) || 0,
+            alpha: Number(alpha?.content) || 1,
+          },
+          range: Range.create(red.start, last.end),
         });
+
         continue;
       }
 
-      for (const token of line.tokens) {
-        if (token.isColorLiteral) {
-          const color = parseColor(token.content.slice(1));
+      for (const token of node.line.tokens) {
+        if (!token.isColorLiteral) continue;
+        const color = parseColor(token.content.slice(1));
 
-          colors.push({
-            range: Range.create(token.start, token.end),
-            color,
-          });
-          continue;
-        }
+        colors.push({
+          range: Range.create(token.start, token.end),
+          color,
+        });
       }
     }
 
@@ -222,8 +226,8 @@ export function startServer(options: LanguageServerOptions) {
     const doc = documents.get(textDocument.uri);
     if (!doc) return [];
 
-    const line = getSelectedLine(doc, range.start);
-    if (line?.tokens[0].content === "packcolor") {
+    const node = getSelectedSyntaxNode(doc, range.start);
+    if (node instanceof PackColorInstruction) {
       const { red, green, blue, alpha } = color;
       // three digits of precision is enough, since each "step" has a value of 0,255
       const r = (value: number) => Math.round(value * 10 ** 3) / 10 ** 3;
@@ -612,8 +616,8 @@ export function startServer(options: LanguageServerOptions) {
     if (!doc) return;
 
     const parserDiagnostics: ParserDiagnostic[] = [...doc.parserDiagnostics];
-    for (const provider of doc.nodes) {
-      provider.provideDiagnostics(parserDiagnostics);
+    for (const node of doc.nodes) {
+      node.provideDiagnostics(parserDiagnostics);
     }
 
     const diagnostics: Diagnostic[] = [];
@@ -647,17 +651,6 @@ export function startServer(options: LanguageServerOptions) {
 
 function getSelectedSyntaxNode(doc: MlogDocument, position: Position) {
   return doc.nodes.find((node) => containsPosition(node, position));
-}
-
-/**
- * Returns the last line whose first token has a start that is
- * less than or equal to the offset
- */
-function getSelectedLine(
-  doc: MlogDocument,
-  position: Position
-): TokenLine | undefined {
-  return getSelectedSyntaxNode(doc, position)?.line;
 }
 
 function* getPartiallySelectedSyntaxNodes(
