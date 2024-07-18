@@ -21,7 +21,7 @@ import {
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
 import { builtinGlobals, keywordConstants } from "./constants";
-import { ParserDiagnostic, TokenLine, parseColor } from "./parser/tokenize";
+import { ParserDiagnostic, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
   InstructionNode,
@@ -41,6 +41,7 @@ import {
   findVariableWriteLocations,
   labelDeclarationNameRange,
   TokenSemanticData,
+  validateLabelUsage,
 } from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
 
@@ -710,6 +711,8 @@ export function startServer(options: LanguageServerOptions) {
     for (const node of doc.nodes) {
       node.provideDiagnostics(parserDiagnostics);
     }
+
+    validateLabelUsage(doc, parserDiagnostics);
 
     const diagnostics: Diagnostic[] = [];
 
