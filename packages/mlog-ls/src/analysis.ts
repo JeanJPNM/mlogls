@@ -145,11 +145,15 @@ export function validateLabelUsage(
   doc: MlogDocument,
   diagnostics: ParserDiagnostic[]
 ) {
+  let instructionCount = 0;
   const nodes = doc.nodes;
   const labels = new Map<string, LabelDeclaration>();
   const unusedLabels = new Set<string>();
 
   for (const node of nodes) {
+    if (node instanceof InstructionNode) {
+      instructionCount++;
+    }
     if (!(node instanceof LabelDeclaration)) continue;
 
     if (!labels.has(node.name)) {
@@ -181,7 +185,23 @@ export function validateLabelUsage(
   for (const node of nodes) {
     if (!(node instanceof JumpInstruction)) continue;
     const { destination } = node.data;
-    if (destination?.type !== "identifier") continue;
+    if (!destination) continue;
+
+    if (destination.isNumber) {
+      const address = Number(destination.content);
+      if (address < 0 || address >= instructionCount) {
+        diagnostics.push({
+          start: destination.start,
+          end: destination.end,
+          message: `Jump address '${address}' is out of range`,
+          severity: DiagnosticSeverity.Error,
+          code: DiagnosticCode.outOfRangeValue,
+        });
+      }
+      continue;
+    }
+
+    if (destination.type !== "identifier") continue;
 
     const label = destination.content;
     unusedLabels.delete(label);
