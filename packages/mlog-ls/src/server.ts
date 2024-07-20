@@ -39,6 +39,8 @@ import {
   findLabels,
   findVariableUsageLocations,
   findVariableWriteLocations,
+  getLabelBlocks,
+  LabelBlock,
   labelDeclarationNameRange,
   TokenSemanticData,
   validateLabelUsage,
@@ -619,21 +621,16 @@ export function startServer(options: LanguageServerOptions) {
   });
 
   connection.onDocumentSymbol((params) => {
-    // TODO: add support for nested labels
-    // TODO: make nesting logic consistent with formatting
     const doc = documents.get(params.textDocument.uri);
     if (!doc) return [];
 
     const { nodes } = doc;
+    const root = getLabelBlocks(nodes);
     const symbols: DocumentSymbol[] = [];
 
-    let i = 0;
-
-    while (i < nodes.length) {
+    const end = root.children[0]?.start ?? root.end;
+    for (let i = 0; i < end; i++) {
       const node = nodes[i];
-      if (node instanceof LabelDeclaration) break;
-
-      i++;
       if (!(node instanceof InstructionNode)) continue;
 
       for (const param of node.parameters) {
@@ -651,58 +648,51 @@ export function startServer(options: LanguageServerOptions) {
       }
     }
 
-    while (i < nodes.length) {
-      const node = nodes[i];
+    for (const child of root.children) {
+      symbols.push(getBlockSymbols(child));
+    }
 
-      if (!(node instanceof LabelDeclaration)) {
-        i++;
-        continue;
-      }
+    function getBlockSymbols(block: LabelBlock): DocumentSymbol {
+      const label = nodes[block.start] as LabelDeclaration;
+      const lastNode = nodes[block.end - 1];
+      const end = block.children[0]?.start ?? block.end;
+      const symbols: DocumentSymbol[] = [];
+      for (let i = block.start; i < end; i++) {
+        const node = nodes[i];
+        if (!(node instanceof InstructionNode)) continue;
 
-      const start = node.start;
-      let end = node.end;
-      const children: DocumentSymbol[] = [];
-
-      // finds every instruction between this and the next label
-      // and adds the variables written by them as children
-      i++;
-      while (i < nodes.length) {
-        const current = nodes[i];
-        if (current instanceof LabelDeclaration) break;
-        i++;
-
-        if (!(current instanceof InstructionNode)) continue;
-
-        end = current.end;
-        for (const parameter of current.parameters) {
+        for (const param of node.parameters) {
           if (
-            parameter.type === ParameterType.variable &&
-            parameter.usage === ParameterUsage.write
+            param.type === ParameterType.variable &&
+            param.usage === ParameterUsage.write
           ) {
-            children.push({
-              name: parameter.token.content,
+            symbols.push({
+              name: param.token.content,
               kind: SymbolKind.Variable,
-              range: parameter.token,
-              selectionRange: parameter.token,
+              range: param.token,
+              selectionRange: param.token,
             });
           }
         }
       }
 
-      symbols.push({
-        name: node.name,
+      for (const child of block.children) {
+        symbols.push(getBlockSymbols(child));
+      }
+
+      return {
+        name: label.name,
         kind: SymbolKind.Function,
-        range: Range.create(start, end),
-        selectionRange: labelDeclarationNameRange(node.nameToken),
-        children,
-      });
+        range: Range.create(label.start, lastNode.end),
+        selectionRange: labelDeclarationNameRange(label.nameToken),
+        children: symbols,
+      };
     }
 
     return symbols;
   });
 
   documents.onDidChangeContent((change) => {
-    // TODO: add diagnostics for unused labels
     // TODO: add diagnostics for unused variables (script-wide)
     const doc = documents.get(change.document.uri);
     if (!doc) return;

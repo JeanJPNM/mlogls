@@ -1,5 +1,6 @@
+import { getLabelBlocks, LabelBlock } from "./analysis";
 import { MlogDocument } from "./document";
-import { CommentLine, LabelDeclaration } from "./parser/nodes";
+import { CommentLine, SyntaxNode } from "./parser/nodes";
 
 export interface FormatOptions {
   doc: MlogDocument;
@@ -17,13 +18,17 @@ export function formatCode({
   const { nodes } = doc;
   const identationUnit = insertSpaces ? " ".repeat(tabSize) : "\t";
 
-  const identationBlocks = getIdentationBlocks(doc);
+  const rootBlock = getLabelBlocks(doc.nodes);
 
   let result = "";
   let lineNumber = 0;
   let i = 0;
 
-  for (const { start, end, indent } of identationBlocks) {
+  //  TODO: fix comments that are meant to be right above labels
+  for (const { start, end, level, extraLine } of indentationBlocks(
+    rootBlock,
+    nodes
+  )) {
     for (; i < end; i++) {
       const node = nodes[i];
       const pos = node.start;
@@ -35,7 +40,7 @@ export function formatCode({
         // no need to force at least one line before the first instruction
         minLines--;
         maxLines--;
-      } else if (i === start && !indent) {
+      } else if (i === start && extraLine) {
         // make sure that non-indented lines have
         // at least one line empty line
         // separating them from the previous block
@@ -44,8 +49,8 @@ export function formatCode({
 
       result += "\n".repeat(clamp(pos.line - lineNumber, minLines, maxLines));
 
-      if (indent) {
-        result += identationUnit;
+      if (level > 0) {
+        result += identationUnit.repeat(level);
       }
 
       result += node.line.tokens.map((token) => token.content).join(" ");
@@ -64,88 +69,65 @@ export function formatCode({
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
-
-interface IdentationBlock {
-  indent: boolean;
+interface IndentationBlock {
+  level: number;
   start: number;
   end: number;
+  extraLine: boolean;
 }
 
-function getIdentationBlocks(doc: MlogDocument) {
-  const nodes = doc.nodes;
-
-  const labelIndexes: number[] = [];
-
-  for (let i = 0; i < nodes.length; i++) {
-    const node = nodes[i];
-    if (node instanceof LabelDeclaration) {
-      labelIndexes.push(i);
-    }
+function* indentationBlocks(
+  block: LabelBlock,
+  nodes: SyntaxNode[]
+): Generator<IndentationBlock> {
+  const { children } = block;
+  if (children.length === 0) {
+    yield {
+      // the root block does not have a label to skip
+      start: block.level === 0 ? block.start : block.start + 1,
+      end: block.end,
+      extraLine: false,
+      level: block.level,
+    };
+    return;
   }
 
-  const flatBlocks: { start: number; end: number }[] = [];
+  let start = block.start;
 
-  for (const index of labelIndexes) {
-    let start = index;
-    const end = index + 1;
-    for (let i = index - 1; i >= 0; i--) {
-      const node = nodes[i];
-      if (!(node instanceof CommentLine)) break;
+  for (const child of children) {
+    let headerStart = child.start;
+    const headerEnd = child.start + 1;
+    let currentLine = nodes[headerStart].start.line;
 
-      if (node.start.character !== 0) continue;
-
-      start = i;
-    }
-
-    flatBlocks.push({ start, end });
-  }
-
-  // preserve identation of
-  // non-indented comment lines at the end of the file
-  if (nodes[nodes.length - 1] instanceof CommentLine) {
-    const end = nodes.length;
-    let start = end;
-    for (let i = start - 1; i >= 0; i--) {
-      const node = nodes[i];
-      if (!(node instanceof CommentLine)) break;
-
-      if (node.start.character !== 0) continue;
-
-      start = i;
+    // include comments that are right above the label
+    // in the "header" block
+    while (headerStart > start) {
+      const previous = nodes[headerStart - 1];
+      if (
+        !(previous instanceof CommentLine) ||
+        previous.start.line !== currentLine - 1
+      )
+        break;
+      headerStart--;
+      currentLine--;
     }
 
-    if (start !== end) flatBlocks.push({ start, end });
-  }
-
-  const blocks: IdentationBlock[] = [];
-
-  let previousEnd = 0;
-  for (const { start, end } of flatBlocks) {
-    // block of non-label header stuff
-    if (previousEnd < start) {
-      blocks.push({
-        start: previousEnd,
-        end: start,
-        indent: previousEnd !== 0,
-      });
+    // instructions that preceed the label
+    if (start !== headerStart) {
+      yield { start, end: headerStart, level: block.level, extraLine: false };
     }
 
-    blocks.push({
-      start,
-      end,
-      indent: false,
-    });
-
-    previousEnd = end;
+    yield {
+      start: headerStart,
+      end: headerEnd,
+      level: block.level,
+      extraLine: true,
+    };
+    yield* indentationBlocks(child, nodes);
+    start = child.end;
   }
 
-  if (previousEnd !== nodes.length) {
-    blocks.push({
-      start: previousEnd,
-      end: nodes.length,
-      indent: previousEnd !== 0,
-    });
+  if (start !== block.end) {
+    yield { start, end: block.end, level: block.level, extraLine: true };
   }
-
-  return blocks;
 }
