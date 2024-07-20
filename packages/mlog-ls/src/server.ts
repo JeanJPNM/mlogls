@@ -380,6 +380,8 @@ export function startServer(options: LanguageServerOptions) {
             hasIndexJump = true;
             break;
         }
+      } else if (node instanceof LabelDeclaration) {
+        hasLabelJump = true;
       }
     }
 
