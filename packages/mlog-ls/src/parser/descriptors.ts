@@ -331,8 +331,7 @@ export function createOverloadDescriptor<
     provideDiagnostics(data, parameters, diagnostics) {
       if (data.type === "unknown" && data.typeToken) {
         diagnostics.push({
-          start: data.typeToken.start,
-          end: data.typeToken.end,
+          range: data.typeToken,
           message: `Unknown ${name} type: ${data.typeToken.content}`,
           severity: DiagnosticSeverity.Error,
           code: DiagnosticCode.unknownVariant,
@@ -460,8 +459,7 @@ export function validateParameters(
         if (param.token.content === "_") break;
 
         diagnostics.push({
-          start: param.token.start,
-          end: param.token.end,
+          range: param.token,
           message:
             "This parameter is ignored by this instruction. Replace it with an underscore.",
           severity: DiagnosticSeverity.Hint,
@@ -471,8 +469,7 @@ export function validateParameters(
         break;
       case ParameterUsage.unused:
         diagnostics.push({
-          start: param.token.start,
-          end: param.token.end,
+          range: param.token,
           message: "Unused parameter",
           severity: DiagnosticSeverity.Hint,
           code: DiagnosticCode.unusedParameter,
@@ -558,8 +555,7 @@ export function validateRestrictedToken(
   if (values.indexOf(token.content) !== -1) return;
 
   diagnostics.push({
-    start: token.start,
-    end: token.end,
+    range: token,
     message: message + token.content,
     severity: DiagnosticSeverity.Warning,
     code: DiagnosticCode.unknownVariant,

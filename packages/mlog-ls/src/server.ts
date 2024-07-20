@@ -453,7 +453,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (selectedParameter?.token.type !== "identifier") return;
+    if (!selectedParameter?.token.isIdentifier) return;
 
     const name = selectedParameter.token.content;
 
@@ -501,7 +501,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (selectedParameter?.token.type !== "identifier") return;
+    if (!selectedParameter?.token.isIdentifier) return;
 
     const name = selectedParameter.token.content;
 
@@ -549,7 +549,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (selectedParameter?.token.type !== "identifier") return;
+    if (!selectedParameter?.token.isIdentifier) return;
 
     const name = selectedParameter.token.content;
 
@@ -604,7 +604,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (selectedParameter?.token.type !== "identifier") return;
+    if (!selectedParameter?.token.isIdentifier) return;
 
     const name = selectedParameter.token.content;
 
@@ -719,7 +719,6 @@ export function startServer(options: LanguageServerOptions) {
     for (const diagnostic of parserDiagnostics) {
       diagnostics.push({
         ...diagnostic,
-        range: Range.create(diagnostic.start, diagnostic.end),
         source: "mlog",
       });
     }

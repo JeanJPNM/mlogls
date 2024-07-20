@@ -1,6 +1,7 @@
 import {
   CompletionItem,
   DiagnosticSeverity,
+  Range,
   SignatureHelp,
 } from "vscode-languageserver";
 import {
@@ -21,16 +22,13 @@ import { counterVar } from "../constants";
 import { CompletionContext, TokenSemanticData } from "../analysis";
 
 export abstract class SyntaxNode {
-  abstract type: string;
   isInstruction = true;
-  constructor(public line: TokenLine) {}
+  start: ParserPosition;
+  end: ParserPosition;
 
-  get start(): ParserPosition {
-    return this.line.start;
-  }
-
-  get end(): ParserPosition {
-    return this.line.end;
+  constructor(public line: TokenLine) {
+    this.start = line.start;
+    this.end = line.end;
   }
 
   provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
@@ -39,8 +37,7 @@ export abstract class SyntaxNode {
 
     if (tokens.length > 16) {
       diagnostics.push({
-        start: tokens[16].start,
-        end: tokens[tokens.length - 1].end,
+        range: Range.create(tokens[16].start, tokens[tokens.length - 1].end),
         message: "Line too long; may only contain 16 tokens",
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.lineTooLong,
@@ -61,7 +58,6 @@ export abstract class SyntaxNode {
 }
 
 export class CommentLine extends SyntaxNode {
-  type = "CommentLine" as const;
   isInstruction = false;
 
   constructor(line: TokenLine) {
@@ -83,7 +79,6 @@ export class CommentLine extends SyntaxNode {
 // TODO: emit error if there are other tokens after the label
 // except for comments
 export class LabelDeclaration extends SyntaxNode {
-  type = "LabelDeclaration" as const;
   isInstruction = false;
 
   nameToken: TextToken;
@@ -145,8 +140,6 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
 export class NoopInstruction extends InstructionNode<
   DataOf<typeof NoopInstruction>
 > {
-  type = "NoopInstruction" as const;
-
   descriptor = NoopInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -177,8 +170,6 @@ export class NoopInstruction extends InstructionNode<
 export class UnknownInstruction extends InstructionNode<
   DataOf<typeof UnknownInstruction>
 > {
-  type = "UnknownInstruction" as const;
-
   descriptor = UnknownInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -203,8 +194,7 @@ export class UnknownInstruction extends InstructionNode<
     const [name] = this.line.tokens;
     diagnostics.push({
       message: `Unknown instruction: ${name.content}`,
-      start: name.start,
-      end: name.end,
+      range: name,
       severity: DiagnosticSeverity.Warning,
       code: DiagnosticCode.unknownInstruction,
     });
@@ -214,8 +204,6 @@ export class UnknownInstruction extends InstructionNode<
 export class ReadInstruction extends InstructionNode<
   DataOf<typeof ReadInstruction>
 > {
-  type = "ReadInstruction" as const;
-
   descriptor = RadarInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -238,8 +226,6 @@ export class ReadInstruction extends InstructionNode<
 export class WriteInstruction extends InstructionNode<
   DataOf<typeof WriteInstruction>
 > {
-  type = "WriteInstruction" as const;
-
   descriptor = WriteInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -262,8 +248,6 @@ export class WriteInstruction extends InstructionNode<
 export class DrawInstruction extends InstructionNode<
   DataOf<typeof DrawInstruction>
 > {
-  type = "DrawInstruction" as const;
-
   descriptor = DrawInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -367,8 +351,6 @@ export class DrawInstruction extends InstructionNode<
 export class PrintInstruction extends InstructionNode<
   DataOf<typeof PrintInstruction>
 > {
-  type = "PrintInstruction" as const;
-
   descriptor = PrintInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -386,8 +368,6 @@ export class PrintInstruction extends InstructionNode<
 export class FormatInstruction extends InstructionNode<
   DataOf<typeof FormatInstruction>
 > {
-  type = "FormatInstruction" as const;
-
   descriptor = FormatInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -404,8 +384,6 @@ export class FormatInstruction extends InstructionNode<
 export class DrawFlushInstruction extends InstructionNode<
   DataOf<typeof DrawFlushInstruction>
 > {
-  type = "DrawFlushInstruction" as const;
-
   descriptor = DrawFlushInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -423,8 +401,6 @@ export class DrawFlushInstruction extends InstructionNode<
 export class PrintFlushInstruction extends InstructionNode<
   DataOf<typeof PrintFlushInstruction>
 > {
-  type = "PrintFlushInstruction" as const;
-
   descriptor = PrintFlushInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -443,8 +419,6 @@ export class PrintFlushInstruction extends InstructionNode<
 export class GetLinkInstruction extends InstructionNode<
   DataOf<typeof GetLinkInstruction>
 > {
-  type = "GetLinkInstruction" as const;
-
   descriptor = GetLinkInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -466,8 +440,6 @@ export class GetLinkInstruction extends InstructionNode<
 export class ControlInstruction extends InstructionNode<
   DataOf<typeof ControlInstruction>
 > {
-  type = "ControlInstruction" as const;
-
   descriptor = ControlInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -511,8 +483,6 @@ const radarSorts = [
 export class RadarInstruction extends InstructionNode<
   DataOf<typeof RadarInstruction>
 > {
-  type = "RadarInstruction" as const;
-
   descriptor = RadarInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -558,8 +528,6 @@ export class RadarInstruction extends InstructionNode<
 export class SensorInstruction extends InstructionNode<
   DataOf<typeof SensorInstruction>
 > {
-  type = "SensorInstruction" as const;
-
   descriptor = SensorInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -582,8 +550,6 @@ export class SensorInstruction extends InstructionNode<
 export class SetInstruction extends InstructionNode<
   DataOf<typeof SetInstruction>
 > {
-  type = "SetInstruction" as const;
-
   descriptor = SetInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -617,8 +583,6 @@ export class SetInstruction extends InstructionNode<
 export class OpInstruction extends InstructionNode<
   DataOf<typeof OpInstruction>
 > {
-  type = "OpInstruction" as const;
-
   descriptor = OpInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -694,8 +658,6 @@ export class OpInstruction extends InstructionNode<
 export class WaitInstruction extends InstructionNode<
   DataOf<typeof WaitInstruction>
 > {
-  type = "WaitInstruction" as const;
-
   descriptor = WaitInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -715,8 +677,6 @@ export class WaitInstruction extends InstructionNode<
 export class StopInstruction extends InstructionNode<
   DataOf<typeof StopInstruction>
 > {
-  type = "StopInstruction" as const;
-
   descriptor = StopInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -747,8 +707,6 @@ export class StopInstruction extends InstructionNode<
 export class LookupInstruction extends InstructionNode<
   DataOf<typeof LookupInstruction>
 > {
-  type = "LookupInstruction" as const;
-
   descriptor = LookupInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -772,8 +730,6 @@ export class LookupInstruction extends InstructionNode<
 export class PackColorInstruction extends InstructionNode<
   DataOf<typeof PackColorInstruction>
 > {
-  type = "PackColorInstruction" as const;
-
   descriptor = PackColorInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -805,8 +761,7 @@ export class PackColorInstruction extends InstructionNode<
 
       if (value < 0 || value > 1) {
         diagnostics.push({
-          start: token.start,
-          end: token.end,
+          range: token,
           message: "packcolor parameters must be within the range: [0, 1]",
           severity: DiagnosticSeverity.Warning,
           code: DiagnosticCode.outOfRangeValue,
@@ -819,8 +774,7 @@ export class PackColorInstruction extends InstructionNode<
         token.content.split(".")[1].length > 3
       ) {
         diagnostics.push({
-          start: token.start,
-          end: token.end,
+          range: token,
           message:
             "Only 3 decimal digits are necessary for packcolor parameters.",
           severity: DiagnosticSeverity.Warning,
@@ -834,8 +788,6 @@ export class PackColorInstruction extends InstructionNode<
 export class EndInstruction extends InstructionNode<
   DataOf<typeof EndInstruction>
 > {
-  type = "EndInstruction" as const;
-
   descriptor = EndInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -854,8 +806,6 @@ export class EndInstruction extends InstructionNode<
 export class JumpInstruction extends InstructionNode<
   DataOf<typeof JumpInstruction>
 > {
-  type = "JumpInstruction" as const;
-
   descriptor = JumpInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -898,8 +848,6 @@ export class JumpInstruction extends InstructionNode<
 export class UnitBindInstruction extends InstructionNode<
   DataOf<typeof UnitBindInstruction>
 > {
-  type = "UnitBindInstruction" as const;
-
   descriptor = UnitBindInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -919,8 +867,6 @@ export class UnitBindInstruction extends InstructionNode<
 export class UnitControlInstruction extends InstructionNode<
   DataOf<typeof UnitControlInstruction>
 > {
-  type = "UnitControlInstruction" as const;
-
   descriptor = UnitControlInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -965,8 +911,6 @@ export class UnitControlInstruction extends InstructionNode<
 export class UnitRadarinstruction extends InstructionNode<
   DataOf<typeof UnitRadarinstruction>
 > {
-  type = "UnitRadarinstruction" as const;
-
   descriptor = UnitRadarinstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1023,8 +967,6 @@ const unitLocateGroups = [
 export class UnitLocateInstruction extends InstructionNode<
   DataOf<typeof UnitLocateInstruction>
 > {
-  type = "UnitLocateInstruction" as const;
-
   descriptor = UnitLocateInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1097,8 +1039,6 @@ export class UnitLocateInstruction extends InstructionNode<
 export class GetBlockInstruction extends InstructionNode<
   DataOf<typeof GetBlockInstruction>
 > {
-  type = "GetBlockInstruction" as const;
-
   descriptor = GetBlockInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1137,8 +1077,6 @@ export class GetBlockInstruction extends InstructionNode<
 export class SetBlockInstruction extends InstructionNode<
   DataOf<typeof SetBlockInstruction>
 > {
-  type = "SetBlockInstruction" as const;
-
   descriptor = SetBlockInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1174,8 +1112,6 @@ export class SetBlockInstruction extends InstructionNode<
 export class SpawnUnitInstruction extends InstructionNode<
   DataOf<typeof SpawnUnitInstruction>
 > {
-  type = "SpawnUnitInstruction" as const;
-
   descriptor = SpawnUnitInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1200,8 +1136,6 @@ export class SpawnUnitInstruction extends InstructionNode<
 export class SenseWeatherInstruction extends InstructionNode<
   DataOf<typeof SenseWeatherInstruction>
 > {
-  type = "SenseWeatherInstruction" as const;
-
   descriptor = SenseWeatherInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1222,8 +1156,6 @@ export class SenseWeatherInstruction extends InstructionNode<
 export class SetWeatherInstruction extends InstructionNode<
   DataOf<typeof SetWeatherInstruction>
 > {
-  type = "SetWeatherInstruction" as const;
-
   descriptor = SetWeatherInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1269,8 +1201,6 @@ const applyStatusEffects = [
 export class ApplyStatusInstruction extends InstructionNode<
   DataOf<typeof ApplyStatusInstruction>
 > {
-  type = "ApplyStatusInstruction" as const;
-
   descriptor = ApplyStatusInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1311,8 +1241,6 @@ export class ApplyStatusInstruction extends InstructionNode<
 export class SpawnWaveInstruction extends InstructionNode<
   DataOf<typeof SpawnWaveInstruction>
 > {
-  type = "SpawnWaveInstruction" as const;
-
   descriptor = SpawnWaveInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1338,8 +1266,6 @@ export class SpawnWaveInstruction extends InstructionNode<
 export class SetRuleInstruction extends InstructionNode<
   DataOf<typeof SetRuleInstruction>
 > {
-  type = "SetRuleInstruction" as const;
-
   descriptor = SetRuleInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1442,8 +1368,6 @@ export class SetRuleInstruction extends InstructionNode<
 export class FlushMessageInstruction extends InstructionNode<
   DataOf<typeof FlushMessageInstruction>
 > {
-  type = "FlushMessageInstruction" as const;
-
   descriptor = FlushMessageInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1476,8 +1400,6 @@ export class FlushMessageInstruction extends InstructionNode<
 export class CutsceneInstruction extends InstructionNode<
   DataOf<typeof CutsceneInstruction>
 > {
-  type = "CutsceneInstruction" as const;
-
   descriptor = CutsceneInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1505,8 +1427,6 @@ export class CutsceneInstruction extends InstructionNode<
 export class EffectInstruction extends InstructionNode<
   DataOf<typeof EffectInstruction>
 > {
-  type = "EffectInstruction" as const;
-
   descriptor = EffectInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1707,8 +1627,6 @@ export class EffectInstruction extends InstructionNode<
 export class ExplosionInstruction extends InstructionNode<
   DataOf<typeof ExplosionInstruction>
 > {
-  type = "ExplosionInstruction" as const;
-
   descriptor = ExplosionInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1736,8 +1654,6 @@ export class ExplosionInstruction extends InstructionNode<
 export class SetRateInstruction extends InstructionNode<
   DataOf<typeof SetRateInstruction>
 > {
-  type = "SetRateInstruction" as const;
-
   descriptor = SetRateInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1757,8 +1673,6 @@ export class SetRateInstruction extends InstructionNode<
 export class FetchInstruction extends InstructionNode<
   DataOf<typeof FetchInstruction>
 > {
-  type = "FetchInstruction" as const;
-
   descriptor = FetchInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1819,8 +1733,6 @@ export class FetchInstruction extends InstructionNode<
 export class SyncInstruction extends InstructionNode<
   DataOf<typeof SyncInstruction>
 > {
-  type = "SyncInstruction" as const;
-
   descriptor = SyncInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1840,8 +1752,6 @@ export class SyncInstruction extends InstructionNode<
 export class GetFlagInstruction extends InstructionNode<
   DataOf<typeof GetFlagInstruction>
 > {
-  type = "GetFlagInstruction" as const;
-
   descriptor = GetFlagInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1862,8 +1772,6 @@ export class GetFlagInstruction extends InstructionNode<
 export class SetFlagInstruction extends InstructionNode<
   DataOf<typeof SetFlagInstruction>
 > {
-  type = "SetFlagInstruction" as const;
-
   descriptor = SetFlagInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1884,8 +1792,6 @@ export class SetFlagInstruction extends InstructionNode<
 export class SetPropInstruction extends InstructionNode<
   DataOf<typeof SetPropInstruction>
 > {
-  type = "SetPropInstruction" as const;
-
   descriptor = SetPropInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
@@ -1907,8 +1813,6 @@ export class SetPropInstruction extends InstructionNode<
 export class SetMarkerInstruction extends InstructionNode<
   DataOf<typeof SetMarkerInstruction>
 > {
-  type = "SetMarkerInstruction" as const;
-
   descriptor = SetMarkerInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1948,8 +1852,6 @@ export class SetMarkerInstruction extends InstructionNode<
 export class MakeMakerInstruction extends InstructionNode<
   DataOf<typeof MakeMakerInstruction>
 > {
-  type = "MakeMakerInstruction" as const;
-
   descriptor = MakeMakerInstruction.descriptor;
 
   static readonly descriptor = createOverloadDescriptor({
@@ -1975,8 +1877,6 @@ export class MakeMakerInstruction extends InstructionNode<
 export class PrintLocaleInstruction extends InstructionNode<
   DataOf<typeof PrintLocaleInstruction>
 > {
-  type = "PrintLocaleInstruction" as const;
-
   descriptor = PrintLocaleInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({

@@ -1,4 +1,4 @@
-import { Diagnostic, Position } from "vscode-languageserver";
+import { Diagnostic, Position, Range } from "vscode-languageserver";
 
 // TODO: emit error if there are more than 500 jumps
 export type TextTokenType =
@@ -43,15 +43,8 @@ export class TextToken {
     return this.type === "label";
   }
 
-  get isConstant() {
-    return (
-      this.content === "true" ||
-      this.content === "false" ||
-      this.content === "null" ||
-      this.isString ||
-      this.isColorLiteral ||
-      this.isNumber
-    );
+  get isIdentifier() {
+    return this.type === "identifier";
   }
 }
 
@@ -82,10 +75,7 @@ export class TokenLine {
 
 export type Lines = TokenLine[];
 
-export type ParserDiagnostic = Omit<Diagnostic, "range"> & {
-  start: ParserPosition;
-  end: ParserPosition;
-};
+export type ParserDiagnostic = Diagnostic;
 
 const missingSpaceErrorMessage = "Expected space after string.";
 
@@ -164,8 +154,7 @@ export function tokenize(chars: string) {
 
     if (pos >= chars.length || chars[pos] != '"') {
       emitError(
-        start,
-        getCurrentLocation(),
+        Range.create(start, getCurrentLocation()),
         'Missing closing quote " before end of line.'
       );
     }
@@ -198,18 +187,14 @@ export function tokenize(chars: string) {
     return new TextToken(start, end, chars.slice(startPos, endPos));
   }
 
-  function emitError(
-    start: ParserPosition,
-    end: ParserPosition,
-    message: string
-  ) {
-    diagnostics.push({ start, end, message });
+  function emitError(range: Range, message: string) {
+    diagnostics.push({ range, message });
   }
 
   /** Apply changes after reading a list of tokens. */
   function checkRead() {
     // set the type of label declarations
-    if (tokens[0].type === "identifier" && tokens[0].content.endsWith(":")) {
+    if (tokens[0].isIdentifier && tokens[0].content.endsWith(":")) {
       tokens[0].type = "label";
     }
 
@@ -247,7 +232,7 @@ export function tokenize(chars: string) {
         tokens.push(token);
 
         if (missingSpace) {
-          emitError(token.start, token.end, missingSpaceErrorMessage);
+          emitError(token, missingSpaceErrorMessage);
           missingSpace = false;
         }
 
@@ -260,7 +245,7 @@ export function tokenize(chars: string) {
         tokens.push(token);
 
         if (missingSpace) {
-          emitError(token.start, token.end, missingSpaceErrorMessage);
+          emitError(token, missingSpaceErrorMessage);
           missingSpace = false;
         }
 

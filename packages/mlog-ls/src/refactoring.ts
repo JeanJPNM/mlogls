@@ -115,7 +115,7 @@ export function convertToNumberedJumps(doc: MlogDocument): TextEdit[] {
     if (!(node instanceof JumpInstruction)) continue;
 
     const { destination } = node.data;
-    if (destination?.type !== "identifier") continue;
+    if (!destination?.isIdentifier) continue;
     const label = destination.content;
     const index = labelIndexes.get(label)?.index;
 

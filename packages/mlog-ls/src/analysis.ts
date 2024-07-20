@@ -165,8 +165,7 @@ export function validateLabelUsage(
     const original = labels.get(node.name)!;
 
     diagnostics.push({
-      start: node.nameToken.start,
-      end: node.nameToken.end,
+      range: node.nameToken,
       message: `Redeclaration of label '${node.name}'`,
       severity: DiagnosticSeverity.Error,
       code: DiagnosticCode.labelRedeclaration,
@@ -191,8 +190,7 @@ export function validateLabelUsage(
       const address = Number(destination.content);
       if (address < 0 || address >= instructionCount) {
         diagnostics.push({
-          start: destination.start,
-          end: destination.end,
+          range: destination,
           message: `Jump address '${address}' is out of range`,
           severity: DiagnosticSeverity.Error,
           code: DiagnosticCode.outOfRangeValue,
@@ -201,15 +199,14 @@ export function validateLabelUsage(
       continue;
     }
 
-    if (destination.type !== "identifier") continue;
+    if (!destination.isIdentifier) continue;
 
     const label = destination.content;
     unusedLabels.delete(label);
 
     if (!labels.has(label)) {
       diagnostics.push({
-        start: destination.start,
-        end: destination.end,
+        range: destination,
         message: `Label '${label}' is not declared`,
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.undefinedLabel,
@@ -221,8 +218,7 @@ export function validateLabelUsage(
     const node = labels.get(label)!;
 
     diagnostics.push({
-      start: node.nameToken.start,
-      end: node.nameToken.end,
+      range: node.nameToken,
       message: `Label '${label}' is declared but never used`,
       severity: DiagnosticSeverity.Warning,
       code: DiagnosticCode.unusedLabel,
