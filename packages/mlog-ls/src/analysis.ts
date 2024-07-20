@@ -167,7 +167,7 @@ export function validateLabelUsage(
     diagnostics.push({
       start: node.nameToken.start,
       end: node.nameToken.end,
-      message: `Label '${node.name}' is already defined`,
+      message: `Redeclaration of label '${node.name}'`,
       severity: DiagnosticSeverity.Error,
       code: DiagnosticCode.labelRedeclaration,
       relatedInformation: [
@@ -210,7 +210,7 @@ export function validateLabelUsage(
       diagnostics.push({
         start: destination.start,
         end: destination.end,
-        message: `Label '${label}' is not defined`,
+        message: `Label '${label}' is not declared`,
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.undefinedLabel,
       });
