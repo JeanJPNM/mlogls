@@ -22,7 +22,13 @@ export async function activate(context: ExtensionContext) {
   });
 
   const clientOptions: LanguageClientOptions = {
-    documentSelector: [{ scheme: "file", language: "mlog" }],
+    documentSelector: [
+      { scheme: "file", language: "mlog" },
+      {
+        scheme: "untitled",
+        language: "mlog",
+      },
+    ],
   };
 
   client = new LanguageClient(
