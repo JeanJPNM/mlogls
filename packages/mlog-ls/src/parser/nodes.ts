@@ -1194,13 +1194,12 @@ export class SetWeatherInstruction extends InstructionNode<
   }
 }
 
-// TODO: update status effects
-// there is one that can make you- [title card]
 const applyStatusEffects = [
   "burning",
   "freezing",
   "unmoving",
   "slow",
+  "fast",
   "wet",
   "muddy",
   "melting",
