@@ -24,7 +24,6 @@ export function formatCode({
   let lineNumber = 0;
   let i = 0;
 
-  //  TODO: fix comments that are meant to be right above labels
   for (const { start, end, level, extraLine } of indentationBlocks(
     rootBlock,
     nodes
