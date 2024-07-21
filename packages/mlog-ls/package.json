@@ -21,18 +21,6 @@
       "require": "./dist/server.cjs",
       "node": "./dist/server.cjs",
       "types": "./dist/server.d.ts"
-    },
-    "./node": {
-      "import": "./dist/nodeServerMain.js",
-      "require": "./dist/nodeServerMain.cjs",
-      "node": "./dist/nodeServerMain.cjs",
-      "types": "./dist/nodeServerMain.d.ts"
-    },
-    "./browser": {
-      "import": "./dist/browserServerMain.js",
-      "require": "./dist/browserServerMain.cjs",
-      "types": "./dist/browserServerMain.d.ts",
-      "node": "./dist/browserServerMain.cjs"
     }
   },
   "repository": {
