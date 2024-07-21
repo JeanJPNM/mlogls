@@ -20,7 +20,7 @@ import {
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
-import { builtinGlobals, keywordConstants } from "./constants";
+import { builtinGlobals, keywords } from "./constants";
 import { ParserDiagnostic, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
@@ -294,18 +294,32 @@ export function startServer(options: LanguageServerOptions) {
 
     const context: CompletionContext = {
       getVariableCompletions() {
-        return [...builtinGlobals, ...declaredVariables(doc.nodes)].map(
-          (variable): CompletionItem => ({
+        const completions: CompletionItem[] = [];
+        for (const keyword of keywords) {
+          completions.push({
+            label: keyword,
+            kind: CompletionItemKind.Keyword,
+            sortText: `0${keyword}`,
+          });
+        }
+
+        for (const global of builtinGlobals) {
+          completions.push({
+            label: global,
+            kind: CompletionItemKind.Variable,
+            sortText: `1${global}`,
+          });
+        }
+
+        for (const variable of declaredVariables(doc.nodes)) {
+          completions.push({
             label: variable,
-            kind:
-              keywordConstants.indexOf(variable) === -1
-                ? CompletionItemKind.Variable
-                : CompletionItemKind.Keyword,
-            sortText: variable.startsWith("@")
-              ? `1${variable}`
-              : `0${variable}`,
-          })
-        );
+            kind: CompletionItemKind.Variable,
+            sortText: `0${variable}`,
+          });
+        }
+
+        return completions;
       },
       // TODO: only give completions for labels
       // accessible in the current "scope"

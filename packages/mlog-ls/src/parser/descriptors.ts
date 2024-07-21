@@ -9,6 +9,7 @@ import {
 import { ParserDiagnostic, TextToken } from "./tokenize";
 import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
 import { CompletionContext, TokenSemanticData } from "../analysis";
+import { builtinGlobalsSet, counterVar } from "../constants";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -584,14 +585,18 @@ function provideSemantics(
           token: param.token,
         });
         break;
-      case ParameterType.variable:
-        if (param.token.content.startsWith("@")) {
-          tokens.push({
-            type: TokenTypes.variable,
-            modifiers: TokenModifiers.readonly,
-            token: param.token,
-          });
-        }
+      case ParameterType.variable: {
+        const { content } = param.token;
+        if (content === counterVar) break;
+
+        if (!builtinGlobalsSet.has(content)) break;
+
+        tokens.push({
+          type: TokenTypes.variable,
+          modifiers: TokenModifiers.readonly,
+          token: param.token,
+        });
+      }
     }
   }
 }
