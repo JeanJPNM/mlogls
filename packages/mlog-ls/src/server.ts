@@ -20,7 +20,7 @@ import {
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
-import { builtinGlobals, keywords } from "./constants";
+import { builtinGlobals, builtinGlobalsSet, keywords } from "./constants";
 import { ParserDiagnostic, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
@@ -597,7 +597,6 @@ export function startServer(options: LanguageServerOptions) {
   });
 
   connection.onPrepareRename((params) => {
-    // TODO: prevent renaming of built-in globals
     const doc = documents.get(params.textDocument.uri);
     if (!doc) return;
 
@@ -624,6 +623,9 @@ export function startServer(options: LanguageServerOptions) {
     if (!selectedParameter?.token.isIdentifier) return;
 
     const name = selectedParameter.token.content;
+
+    if (keywords.includes(name)) return;
+    if (builtinGlobalsSet.has(name)) return;
 
     switch (selectedParameter.type) {
       case ParameterType.variable:
