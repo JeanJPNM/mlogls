@@ -113,7 +113,12 @@ function* indentationBlocks(
 
     // instructions that preceed the label
     if (start !== headerStart) {
-      yield { start, end: headerStart, level: block.level, extraLine: false };
+      // the extra line only affects the comments between labels
+      // not the instructions that come before them,
+      // because at that point, the index of the instruction
+      // will be greater than `start`, which means that
+      // the extra line will not be added
+      yield { start, end: headerStart, level: block.level, extraLine: true };
     }
 
     yield {
