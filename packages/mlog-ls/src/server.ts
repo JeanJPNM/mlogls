@@ -36,7 +36,7 @@ import {
   declaredVariables,
   findLabelDefinition,
   findLabelReferences,
-  findLabels,
+  findLabelsInScope,
   findVariableUsageLocations,
   findVariableWriteLocations,
   getLabelBlocks,
@@ -265,7 +265,8 @@ export function startServer(options: LanguageServerOptions) {
 
     const { position } = params;
 
-    const node = getSelectedSyntaxNode(doc, position);
+    const nodeIndex = getSelectedSyntaxNodeIndex(doc, position);
+    const node = doc.nodes[nodeIndex];
     const line = node?.line;
 
     const selectedToken = line?.tokens.find((token) =>
@@ -321,10 +322,8 @@ export function startServer(options: LanguageServerOptions) {
 
         return completions;
       },
-      // TODO: only give completions for labels
-      // accessible in the current "scope"
       getLabelCompletions() {
-        return [...findLabels(doc.nodes)].map((label) => ({
+        return [...findLabelsInScope(doc.nodes, nodeIndex)].map((label) => ({
           label,
           kind: CompletionItemKind.Function,
         }));
@@ -746,6 +745,10 @@ export function startServer(options: LanguageServerOptions) {
 
   // Listen on the connection
   connection.listen();
+}
+
+function getSelectedSyntaxNodeIndex(doc: MlogDocument, position: Position) {
+  return doc.nodes.findIndex((node) => containsPosition(node, position));
 }
 
 function getSelectedSyntaxNode(doc: MlogDocument, position: Position) {

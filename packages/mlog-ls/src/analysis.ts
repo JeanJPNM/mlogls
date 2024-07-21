@@ -42,11 +42,35 @@ export interface LabelBlock {
   children: LabelBlock[];
 }
 
-export function findLabels(nodes: SyntaxNode[]) {
+/**
+ * Returns a set of label names that are accessible
+ * in the logical scope of the node at the provided index.
+ *
+ * Only top-level labels and all labels part of the
+ * top-level block that contains the index are returned.
+ */
+export function findLabelsInScope(
+  nodes: SyntaxNode[],
+  currentNodeIndex: number
+) {
   const labels = new Set<string>();
-  for (const node of nodes) {
-    if (!(node instanceof LabelDeclaration)) continue;
-    labels.add(node.name);
+  const root = getLabelBlocks(nodes);
+
+  let parent: LabelBlock | undefined = root;
+  while (parent) {
+    const block: LabelBlock = parent;
+    parent = undefined;
+
+    for (const child of block.children) {
+      const label = nodes[child.start] as LabelDeclaration;
+      labels.add(label.name);
+
+      if (child.start > currentNodeIndex || child.end < currentNodeIndex) {
+        continue;
+      }
+
+      parent = child;
+    }
   }
 
   return labels;
