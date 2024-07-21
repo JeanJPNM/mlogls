@@ -95,6 +95,21 @@ repository:
     patterns:
       - name: constant.character.escape.mlog
         match: \\n
+        # by default, a single bracket is treated as the start
+        # of a tag, and two brackets are an escaped bracket
+      - name: constant.character.escape.mlog
+        match: \[\[
+        # matches color opening brackets like [red]
+        # and their closing pairs, []
+      - match: (\[)([^\[\]]*)(\])
+        captures:
+          1:
+            name: punctuation.definition.tag.begin.mlog
+          2:
+            name: entity.name.tag.mlog
+          3:
+            name: punctuation.definition.tag.end.mlog
+      - name: constant.character.escape.mlog
       - match: (\{)(\d)(\})
         captures:
           1:
