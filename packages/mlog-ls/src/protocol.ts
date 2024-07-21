@@ -60,6 +60,7 @@ export enum DiagnosticCode {
   unknownVariant = "unknown-variant",
   unusedParameter = "unused-parameter",
   labelRedeclaration = "label-redeclaration",
+  unexpectedToken = "unexpected-token",
 }
 
 type TokenLegend<K extends string> = Record<K, number> & { keys: K[] };

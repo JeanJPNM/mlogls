@@ -76,8 +76,6 @@ export class CommentLine extends SyntaxNode {
   }
 }
 
-// TODO: emit error if there are other tokens after the label
-// except for comments
 export class LabelDeclaration extends SyntaxNode {
   isInstruction = false;
 
@@ -89,6 +87,29 @@ export class LabelDeclaration extends SyntaxNode {
 
     this.nameToken = line.tokens[0];
     this.name = line.tokens[0].content.slice(0, -1);
+  }
+
+  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
+    super.provideDiagnostics(diagnostics);
+
+    const { tokens } = this.line;
+
+    let tokenCount = tokens.length;
+    if (tokens[tokens.length - 1].isComment) {
+      tokenCount--;
+    }
+
+    if (tokenCount === 1) return;
+
+    const first = tokens[1];
+    const last = tokens[tokenCount - 1];
+
+    diagnostics.push({
+      range: Range.create(first.start, last.end),
+      message: "Unexpected token after label declaration",
+      severity: DiagnosticSeverity.Error,
+      code: DiagnosticCode.unexpectedToken,
+    });
   }
 
   provideSignatureHelp(): SignatureHelp {
