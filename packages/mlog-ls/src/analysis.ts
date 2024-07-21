@@ -15,6 +15,7 @@ import {
 import { ParserDiagnostic, ParserPosition, TextToken } from "./parser/tokenize";
 import { MlogDocument } from "./document";
 import { DiagnosticCode } from "./protocol";
+import { maxLabelCount } from "./constants";
 
 export interface TokenSemanticData {
   token: TextToken;
@@ -186,6 +187,7 @@ export function validateLabelUsage(
   diagnostics: ParserDiagnostic[]
 ) {
   let instructionCount = 0;
+  let labelCount = 0;
   const nodes = doc.nodes;
   const labels = new Map<string, LabelDeclaration>();
   const unusedLabels = new Set<string>();
@@ -195,6 +197,16 @@ export function validateLabelUsage(
       instructionCount++;
     }
     if (!(node instanceof LabelDeclaration)) continue;
+    labelCount++;
+
+    if (labelCount > maxLabelCount) {
+      diagnostics.push({
+        range: node.nameToken,
+        message: `Exceeded maximum label count of ${maxLabelCount}`,
+        severity: DiagnosticSeverity.Error,
+        code: DiagnosticCode.tooManyLabels,
+      });
+    }
 
     if (!labels.has(node.name)) {
       labels.set(node.name, node);

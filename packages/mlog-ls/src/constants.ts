@@ -1,3 +1,5 @@
+export const maxLabelCount = 500;
+
 export const keywords = ["true", "false", "null"];
 
 export const mathConstants = ["@pi", "@e", "@degToRad", "@radToDeg"];

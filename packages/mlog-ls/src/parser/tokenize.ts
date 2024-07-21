@@ -1,6 +1,5 @@
 import { Diagnostic, Position, Range } from "vscode-languageserver";
 
-// TODO: emit error if there are more than 500 jumps
 export type TextTokenType =
   | "comment"
   | "string"
