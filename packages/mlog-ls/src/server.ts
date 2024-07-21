@@ -17,6 +17,7 @@ import {
   TextDocumentIdentifier,
   DocumentSymbol,
   SymbolKind,
+  FoldingRange,
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
@@ -125,6 +126,7 @@ export function startServer(options: LanguageServerOptions) {
           prepareProvider: true,
         },
         documentSymbolProvider: true,
+        foldingRangeProvider: true,
       },
     };
 
@@ -707,6 +709,34 @@ export function startServer(options: LanguageServerOptions) {
     }
 
     return symbols;
+  });
+
+  connection.onFoldingRanges((params) => {
+    const doc = documents.get(params.textDocument.uri);
+    if (!doc) return;
+
+    const { nodes } = doc;
+
+    const ranges: FoldingRange[] = [];
+
+    const root = getLabelBlocks(doc.nodes);
+
+    function traverse(block: LabelBlock) {
+      ranges.push({
+        startLine: nodes[block.start].start.line,
+        endLine: nodes[block.end - 1].end.line,
+      });
+
+      for (const child of block.children) {
+        traverse(child);
+      }
+    }
+
+    for (const child of root.children) {
+      traverse(child);
+    }
+
+    return ranges;
   });
 
   documents.onDidChangeContent((change) => {
