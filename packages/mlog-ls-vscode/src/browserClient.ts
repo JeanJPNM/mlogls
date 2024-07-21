@@ -31,12 +31,7 @@ export async function activate(context: ExtensionContext) {
     ],
   };
 
-  client = new LanguageClient(
-    "REPLACE_ME language-server-id",
-    "REPLACE_ME language server name",
-    clientOptions,
-    worker
-  );
+  client = new LanguageClient("mlog-ls", "mlog-ls", clientOptions, worker);
 
   await client.start();
   console.log("lsp-web-extension-sample server is ready");
