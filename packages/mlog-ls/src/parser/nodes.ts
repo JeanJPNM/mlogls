@@ -13,6 +13,7 @@ import {
   ParserDiagnostic,
   ParserPosition,
   TextToken,
+  TextTokenType,
   TokenLine,
 } from "./tokenize";
 import { DiagnosticCode, TokenTypes } from "../protocol";
@@ -2071,11 +2072,6 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   makemarker: MakeMakerInstruction.parse,
   printlocale: PrintLocaleInstruction.parse,
 };
-
-function tokenToNumber(token: TextToken) {
-  if (token.type !== "number") return undefined;
-  return Number(token.content);
-}
 
 export function getInstructionNames() {
   return Object.keys(instructionParsers);

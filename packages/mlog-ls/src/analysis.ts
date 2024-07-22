@@ -15,7 +15,7 @@ import {
 import { ParserDiagnostic, ParserPosition, TextToken } from "./parser/tokenize";
 import { MlogDocument } from "./document";
 import { DiagnosticCode } from "./protocol";
-import { maxLabelCount } from "./constants";
+import { buildingLinkNames, maxLabelCount } from "./constants";
 
 export interface TokenSemanticData {
   token: TextToken;
@@ -42,6 +42,8 @@ export interface LabelBlock {
   level: number;
   children: LabelBlock[];
 }
+
+export const buildingNamePattern = /(\w+)(\d+)/;
 
 /**
  * Returns a set of label names that are accessible
@@ -85,11 +87,12 @@ export function declaredVariables(nodes: SyntaxNode[]) {
 
     for (const param of node.parameters) {
       if (
-        param.type === ParameterType.variable &&
-        param.usage === ParameterUsage.write
-      ) {
-        variables.add(param.token.content);
-      }
+        param.type !== ParameterType.variable ||
+        param.usage !== ParameterUsage.write ||
+        !param.token.isIdentifier
+      )
+        continue;
+      variables.add(param.token.content);
     }
   }
 
@@ -106,11 +109,13 @@ export function findVariableUsageLocations(
 
     for (const param of node.parameters) {
       if (
-        param.type === ParameterType.variable &&
-        param.token.content === variable
-      ) {
-        locations.push(param.token);
-      }
+        param.type !== ParameterType.variable &&
+        param.type !== ParameterType.readonlyGlobal &&
+        param.type !== ParameterType.buildingLink
+      )
+        continue;
+      if (param.token.content !== variable) continue;
+      locations.push(param.token);
     }
   }
 
@@ -395,4 +400,38 @@ export function getLabelBlocks(nodes: SyntaxNode[]) {
   root.end = nodes.length;
 
   return root;
+}
+
+export function usedBuildingLinks(nodes: SyntaxNode[]) {
+  const links = new Map<string, number>();
+
+  for (const node of nodes) {
+    if (!(node instanceof InstructionNode)) continue;
+
+    for (const param of node.parameters) {
+      if (param.type !== ParameterType.buildingLink) continue;
+      const match = buildingNamePattern.exec(param.token.content);
+      if (!match) continue;
+
+      const linkName = match[1];
+      const linkNumber = Number(match[2]);
+
+      if (!buildingLinkNames.has(linkName)) continue;
+
+      links.set(
+        linkName,
+        Math.max(links.get(param.token.content) || 0, linkNumber)
+      );
+    }
+  }
+
+  return links;
+}
+
+export function isBuildingLink(name: string) {
+  const match = buildingNamePattern.exec(name);
+  if (!match) return false;
+
+  const linkName = match[1];
+  return buildingLinkNames.has(linkName);
 }

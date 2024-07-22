@@ -1,13 +1,14 @@
 import { Diagnostic, Position, Range } from "vscode-languageserver";
 import { DiagnosticCode } from "../protocol";
 
-export type TextTokenType =
-  | "comment"
-  | "string"
-  | "number"
-  | "color"
-  | "label"
-  | "identifier";
+export enum TextTokenType {
+  comment,
+  string,
+  number,
+  color,
+  label,
+  identifier,
+}
 
 export class ParserPosition implements Position {
   constructor(public line: number, public character: number) {}
@@ -24,37 +25,37 @@ export class TextToken {
   }
 
   get isComment() {
-    return this.type === "comment";
+    return this.type === TextTokenType.comment;
   }
 
   get isString() {
-    return this.type === "string";
+    return this.type === TextTokenType.string;
   }
 
   get isNumber() {
-    return this.type === "number";
+    return this.type === TextTokenType.number;
   }
 
   get isColorLiteral() {
-    return this.type === "color";
+    return this.type === TextTokenType.color;
   }
 
   get isLabel() {
-    return this.type === "label";
+    return this.type === TextTokenType.label;
   }
 
   get isIdentifier() {
-    return this.type === "identifier";
+    return this.type === TextTokenType.identifier;
   }
 }
 
 function getTextTokenType(content: string): TextTokenType {
-  if (content.startsWith("#")) return "comment";
-  if (content.startsWith('"')) return "string";
-  if (content.startsWith("%")) return "color";
-  if (!isNaN(Number(content))) return "number";
+  if (content.startsWith("#")) return TextTokenType.comment;
+  if (content.startsWith('"')) return TextTokenType.string;
+  if (content.startsWith("%")) return TextTokenType.color;
+  if (!isNaN(Number(content))) return TextTokenType.number;
 
-  return "identifier";
+  return TextTokenType.identifier;
 }
 
 /**
@@ -192,7 +193,7 @@ export function tokenize(chars: string) {
   function checkRead() {
     // set the type of label declarations
     if (tokens[0].isIdentifier && tokens[0].content.endsWith(":")) {
-      tokens[0].type = "label";
+      tokens[0].type = TextTokenType.label;
     }
 
     if (tokens.length > 1 && tokens[0].content === "op") {

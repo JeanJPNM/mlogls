@@ -22,13 +22,14 @@ import {
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
 import {
+  buildingLinkNames,
   builtinGlobals,
   builtinGlobalsSet,
   colorData,
   colorsSet,
   keywords,
 } from "./constants";
-import { ParserDiagnostic, parseColor } from "./parser/tokenize";
+import { ParserDiagnostic, TextTokenType, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
   InstructionNode,
@@ -51,6 +52,7 @@ import {
   LabelBlock,
   labelDeclarationNameRange,
   TokenSemanticData,
+  usedBuildingLinks,
   validateLabelUsage,
 } from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
@@ -434,6 +436,20 @@ export function startServer(options: LanguageServerOptions) {
           });
         }
 
+        const usedLinks = usedBuildingLinks(doc.nodes);
+
+        for (const name of buildingLinkNames) {
+          const limit = usedLinks.get(name) ?? 1;
+
+          for (let i = 1; i <= limit; i++) {
+            completions.push({
+              label: `${name}${i}`,
+              kind: CompletionItemKind.Variable,
+              sortText: `1${name}${i}`,
+            });
+          }
+        }
+
         return completions;
       },
       getLabelCompletions() {
@@ -506,10 +522,10 @@ export function startServer(options: LanguageServerOptions) {
       if (node instanceof JumpInstruction) {
         const { destination } = node.data;
         switch (destination?.type) {
-          case "identifier":
+          case TextTokenType.identifier:
             hasLabelJump = true;
             break;
-          case "number":
+          case TextTokenType.number:
             hasIndexJump = true;
             break;
         }
@@ -675,6 +691,8 @@ export function startServer(options: LanguageServerOptions) {
 
     switch (selectedParameter.type) {
       case ParameterType.variable:
+      case ParameterType.buildingLink:
+      case ParameterType.readonlyGlobal:
         return findVariableUsageLocations(name, doc.nodes).map((location) => ({
           uri: params.textDocument.uri,
           range: location,
@@ -774,9 +792,6 @@ export function startServer(options: LanguageServerOptions) {
     if (!selectedParameter?.token.isIdentifier) return;
 
     const name = selectedParameter.token.content;
-
-    if (keywords.includes(name)) return;
-    if (builtinGlobalsSet.has(name)) return;
 
     switch (selectedParameter.type) {
       case ParameterType.variable:

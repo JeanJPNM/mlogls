@@ -8,7 +8,11 @@ import {
 } from "vscode-languageserver";
 import { ParserDiagnostic, TextToken } from "./tokenize";
 import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
-import { CompletionContext, TokenSemanticData } from "../analysis";
+import {
+  CompletionContext,
+  isBuildingLink,
+  TokenSemanticData,
+} from "../analysis";
 import { builtinGlobalsSet, counterVar, keywords } from "../constants";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
@@ -24,6 +28,9 @@ export enum ParameterType {
   label,
   variable,
   enumMember,
+  keyword,
+  readonlyGlobal,
+  buildingLink,
 }
 
 export interface InstructionParameter {
@@ -107,49 +114,8 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
 }): InstructionDescriptor<DescriptorData<T>> {
   return {
     parse(tokens) {
-      const data: DescriptorData<T> = {};
-      const parameters: InstructionParameter[] = [];
-
-      let key: keyof T;
-      let i = 1;
-      for (key in descriptor) {
-        const token = tokens[i];
-        data[key] = token?.isComment ? undefined : token;
-        if (token) {
-          let usage = ParameterUsage.read;
-          const param = descriptor[key];
-          if (param.isOutput) {
-            usage = ParameterUsage.write;
-          } else if (key.startsWith("_")) {
-            usage = ParameterUsage.ignored;
-          }
-
-          let type = ParameterType.variable;
-          if (param.restrict) {
-            type = ParameterType.enumMember;
-          } else if (param.isLabel) {
-            type = ParameterType.label;
-          }
-
-          parameters.push({
-            type,
-            token,
-            usage,
-          });
-        }
-        i++;
-      }
-
-      for (; i < tokens.length; i++) {
-        const token = tokens[i];
-        if (token.isComment) break;
-
-        parameters.push({
-          type: ParameterType.variable,
-          token,
-          usage: ParameterUsage.unused,
-        });
-      }
+      const data = parseDescriptor(descriptor, tokens);
+      const parameters = parseParameters(descriptor, tokens);
 
       return [data, parameters];
     },
@@ -382,12 +348,25 @@ function parseParameters<const T extends SingleDescriptor>(
       } else if (key.startsWith("_")) {
         usage = ParameterUsage.ignored;
       }
+
+      let type = ParameterType.variable;
+      if (param.restrict) {
+        type = ParameterType.enumMember;
+      } else if (param.isLabel) {
+        type = ParameterType.label;
+      } else if (keywords.includes(token.content)) {
+        type = ParameterType.keyword;
+      } else if (
+        token.content != counterVar &&
+        builtinGlobalsSet.has(token.content)
+      ) {
+        type = ParameterType.readonlyGlobal;
+      } else if (isBuildingLink(token.content)) {
+        type = ParameterType.buildingLink;
+      }
+
       parameters.push({
-        type: param.restrict
-          ? ParameterType.enumMember
-          : !!param.isLabel
-          ? ParameterType.label
-          : ParameterType.variable,
+        type,
         token,
         usage,
       });
@@ -450,9 +429,9 @@ export function validateParameters(
   diagnostics: ParserDiagnostic[]
 ) {
   for (const param of parameters) {
-    if (param.type !== ParameterType.variable) continue;
     switch (param.usage) {
       case ParameterUsage.ignored:
+        if (param.type !== ParameterType.variable) break;
         if (param.token.content === "_") break;
 
         diagnostics.push({
@@ -465,6 +444,7 @@ export function validateParameters(
         });
         break;
       case ParameterUsage.unused:
+        if (param.type !== ParameterType.variable) break;
         diagnostics.push({
           range: param.token,
           message: "Unused parameter",
@@ -474,23 +454,32 @@ export function validateParameters(
         });
         break;
       case ParameterUsage.write:
-        if (keywords.includes(param.token.content)) {
-          diagnostics.push({
-            range: param.token,
-            message: "Cannot use a keyword as an output parameter",
-            code: DiagnosticCode.writingToReadOnly,
-            severity: DiagnosticSeverity.Error,
-          });
-        } else if (
-          param.token.content != counterVar &&
-          builtinGlobalsSet.has(param.token.content)
-        ) {
-          diagnostics.push({
-            range: param.token,
-            message: "Cannot write to a read-only variable",
-            severity: DiagnosticSeverity.Error,
-            code: DiagnosticCode.writingToReadOnly,
-          });
+        switch (param.type) {
+          case ParameterType.keyword:
+            diagnostics.push({
+              range: param.token,
+              message: "Cannot use a keyword as an output parameter",
+              code: DiagnosticCode.writingToReadOnly,
+              severity: DiagnosticSeverity.Error,
+            });
+            break;
+          case ParameterType.readonlyGlobal:
+          case ParameterType.buildingLink:
+            diagnostics.push({
+              range: param.token,
+              message: "Cannot write to a read-only variable",
+              code: DiagnosticCode.writingToReadOnly,
+              severity: DiagnosticSeverity.Error,
+            });
+            break;
+          case ParameterType.variable:
+            if (param.token.isIdentifier) break;
+            diagnostics.push({
+              range: param.token,
+              message: "Cannot write to a literal value",
+              code: DiagnosticCode.writingToReadOnly,
+              severity: DiagnosticSeverity.Error,
+            });
         }
     }
   }
@@ -588,10 +577,6 @@ function provideSemantics(
         tokens.push({
           type: TokenTypes.enumMember,
           token: param.token,
-          modifiers:
-            param.usage === ParameterUsage.write
-              ? TokenModifiers.modification
-              : 0,
         });
         break;
       case ParameterType.label:
@@ -600,18 +585,22 @@ function provideSemantics(
           token: param.token,
         });
         break;
-      case ParameterType.variable: {
-        const { content } = param.token;
-        if (content === counterVar) break;
-
-        if (!builtinGlobalsSet.has(content)) break;
-
+      case ParameterType.readonlyGlobal:
+      case ParameterType.buildingLink: {
         tokens.push({
+          token: param.token,
           type: TokenTypes.variable,
           modifiers: TokenModifiers.readonly,
-          token: param.token,
         });
       }
+      case ParameterType.variable:
+        if (param.usage !== ParameterUsage.write) break;
+
+        tokens.push({
+          token: param.token,
+          type: TokenTypes.variable,
+          modifiers: TokenModifiers.modification,
+        });
     }
   }
 }
