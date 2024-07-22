@@ -1,7 +1,7 @@
 # mlogls
 
 A [language server protocol](https://microsoft.github.io/language-server-protocol/) implementation
-for the [Mindustry](https://github.com/Anuken/Mindustry)'s logic programming language, also known as [mlog](https://mindustrygame.github.io/wiki/logic/0-introduction/).
+for the [Mindustry](https://github.com/Anuken/Mindustry) logic programming language, also known as [mlog](https://mindustrygame.github.io/wiki/logic/0-introduction/).
 
 ## Packages
 
