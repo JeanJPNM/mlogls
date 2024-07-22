@@ -1,5 +1,7 @@
 {
   "name": "mlogls-vscode",
+  "displayName": "Mindustry Logic for VSCode",
+  "description": "Mindustry Logic language support for VSCode",
   "private": true,
   "author": "JeanJPNM",
   "license": "GPL-3.0-only",
