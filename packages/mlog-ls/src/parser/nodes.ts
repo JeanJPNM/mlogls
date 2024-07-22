@@ -29,7 +29,6 @@ import { CompletionContext, TokenSemanticData } from "../analysis";
 import { MlogDocument } from "../document";
 
 export abstract class SyntaxNode {
-  isInstruction = true;
   start: ParserPosition;
   end: ParserPosition;
 
@@ -71,8 +70,6 @@ export abstract class SyntaxNode {
 }
 
 export class CommentLine extends SyntaxNode {
-  isInstruction = false;
-
   constructor(line: TokenLine) {
     super(line);
   }
@@ -90,8 +87,6 @@ export class CommentLine extends SyntaxNode {
 }
 
 export class LabelDeclaration extends SyntaxNode {
-  isInstruction = false;
-
   nameToken: TextToken;
   name: string;
 
