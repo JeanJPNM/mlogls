@@ -418,10 +418,7 @@ export function usedBuildingLinks(nodes: SyntaxNode[]) {
 
       if (!buildingLinkNames.has(linkName)) continue;
 
-      links.set(
-        linkName,
-        Math.max(links.get(param.token.content) || 0, linkNumber)
-      );
+      links.set(linkName, Math.max(links.get(linkName) || 0, linkNumber));
     }
   }
 
