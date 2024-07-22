@@ -463,6 +463,7 @@ export function validateUnusedVariables(
       )
         continue;
 
+      if (param.token.content === "_") continue;
       if (!unusedVariables.has(param.token.content)) continue;
 
       diagnostics.push({

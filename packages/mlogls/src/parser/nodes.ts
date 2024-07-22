@@ -180,6 +180,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
   ): void {
     switch (diagnostic.code) {
       case DiagnosticCode.ignoredValue:
+      case DiagnosticCode.unusedVariable:
         actions.push({
           title: "Replace with _",
           edit: {
