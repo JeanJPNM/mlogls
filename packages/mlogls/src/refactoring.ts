@@ -1,5 +1,5 @@
 import { Position, Range, TextEdit } from "vscode-languageserver";
-import { JumpInstruction, LabelDeclaration, SyntaxNode } from "./parser/nodes";
+import { InstructionNode, JumpInstruction, LabelDeclaration, SyntaxNode } from "./parser/nodes";
 import { MlogDocument } from "./document";
 
 export function convertToLabeledJumps(doc: MlogDocument): TextEdit[] {
@@ -19,7 +19,7 @@ export function convertToLabeledJumps(doc: MlogDocument): TextEdit[] {
         }
       }
 
-      if (node.isInstruction) {
+      if (node instanceof InstructionNode) {
         instructionIndex++;
       }
     }
@@ -30,7 +30,7 @@ export function convertToLabeledJumps(doc: MlogDocument): TextEdit[] {
     if (!(node instanceof JumpInstruction)) continue;
 
     const { destination } = node.data;
-    if (destination?.type !== "number") continue;
+    if (!destination?.isNumber) continue;
 
     // convert negative indexes to 0
     const index = Math.max(Number(destination.content), 0);
@@ -60,7 +60,7 @@ export function convertToLabeledJumps(doc: MlogDocument): TextEdit[] {
   ) {
     const node = nodes[i];
 
-    if (!node.isInstruction) continue;
+    if (!(node instanceof InstructionNode)) continue;
 
     const [jumpIndex, jumps] = sortedEntries[currentEntry];
 
@@ -104,7 +104,7 @@ export function convertToNumberedJumps(doc: MlogDocument): TextEdit[] {
       labelIndexes.set(node.name, { node, index });
     }
 
-    if (node.isInstruction) {
+    if (node instanceof InstructionNode) {
       index++;
     }
   }
