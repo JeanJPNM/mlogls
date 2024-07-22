@@ -432,3 +432,46 @@ export function isBuildingLink(name: string) {
   const linkName = match[1];
   return buildingLinkNames.has(linkName);
 }
+
+export function validateUnusedVariables(
+  nodes: SyntaxNode[],
+  diagnostics: ParserDiagnostic[]
+) {
+  const variables = declaredVariables(nodes);
+  const unusedVariables = new Set<string>(variables);
+
+  for (const node of nodes) {
+    if (!(node instanceof InstructionNode)) continue;
+
+    for (const param of node.parameters) {
+      if (
+        param.type !== ParameterType.variable ||
+        param.usage !== ParameterUsage.read
+      )
+        continue;
+      unusedVariables.delete(param.token.content);
+    }
+  }
+
+  for (const node of nodes) {
+    if (!(node instanceof InstructionNode)) continue;
+
+    for (const param of node.parameters) {
+      if (
+        param.type !== ParameterType.variable ||
+        param.usage !== ParameterUsage.write
+      )
+        continue;
+
+      if (!unusedVariables.has(param.token.content)) continue;
+
+      diagnostics.push({
+        range: param.token,
+        message: `Variable '${param.token.content}' is declared but never used`,
+        severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.unusedVariable,
+        tags: [DiagnosticTag.Unnecessary],
+      });
+    }
+  }
+}
