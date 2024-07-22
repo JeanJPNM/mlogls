@@ -3,16 +3,22 @@
   "private": true,
   "author": "JeanJPNM",
   "license": "MIT",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "publisher": "JeanJPNM",
   "categories": [
-    "Programming Languages"
+    "Programming Languages",
+    "Formatters"
   ],
   "engines": {
     "vscode": "^1.75.0"
   },
   "activationEvents": [
     "onLanguage"
+  ],
+  "keywords": [
+    "mindustry",
+    "mindustry-logic",
+    "mlog"
   ],
   "main": "./dist/nodeClient.js",
   "browser": "./dist/browserClient.js",
@@ -43,10 +49,14 @@
       }
     ]
   },
+  "homepage": "https://github.com/JeanJPNM/mlog-ls#readme",
   "repository": {
     "type": "git",
     "url": "https://github.com/JeanJPNM/mlog-ls.git",
     "directory": "packages/mlog-ls-vscode"
+  },
+  "bugs": {
+    "url": "https://github.com/JeanJPNM/mlog-ls/issues"
   },
   "devDependencies": {
     "@types/vscode": "^1.75.0",
