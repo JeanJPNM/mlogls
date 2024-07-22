@@ -21,7 +21,13 @@ import {
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
 import { TokenModifiers, TokenTypes } from "./protocol";
-import { builtinGlobals, builtinGlobalsSet, keywords } from "./constants";
+import {
+  builtinGlobals,
+  builtinGlobalsSet,
+  colorData,
+  colorsSet,
+  keywords,
+} from "./constants";
 import { ParserDiagnostic, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
@@ -280,16 +286,53 @@ export function startServer(options: LanguageServerOptions) {
       }
 
       for (const token of node.line.tokens) {
-        if (!token.isColorLiteral) continue;
-        const color = parseColor(token.content.slice(1));
+        if (token.isIdentifier && colorsSet.has(token.content)) {
+          // remove the leading @
+          const name = token.content.slice(1);
+          const color = parseColor(colorData[name]);
 
-        colors.push({
-          range: Range.create(token.start, token.end),
-          color,
-        });
+          colors.push({
+            range: Range.create(token.start, token.end),
+            color,
+          });
+        } else if (token.isColorLiteral) {
+          const color = parseColor(token.content.slice(1));
+
+          colors.push({
+            range: Range.create(token.start, token.end),
+            color,
+          });
+        } else if (token.isString) {
+          // matches opening color tags
+          const tagPattern = /\[([^\[\]]+)\]/g;
+
+          let match;
+          while ((match = tagPattern.exec(token.content))) {
+            const tag = match[1];
+            const isLiteral = tag.startsWith("#");
+            if (!isLiteral && !(tag in colorData)) continue;
+
+            // exclude the openning and closing bracket
+            const start = token.start.character + match.index + 1;
+            const end = start + tag.length;
+
+            const color = isLiteral
+              ? parseColor(tag.slice(1))
+              : parseColor(colorData[tag]);
+
+            colors.push({
+              range: Range.create(
+                token.start.line,
+                start,
+                token.start.line,
+                end
+              ),
+              color,
+            });
+          }
+        }
       }
     }
-
     return colors;
   });
 
@@ -311,16 +354,21 @@ export function startServer(options: LanguageServerOptions) {
       ];
     }
 
+    const token = node?.line.tokens.find((token) =>
+      containsPosition(token, range.start)
+    );
+
     const red = Math.round(color.red * 255);
     const green = Math.round(color.green * 255);
     const blue = Math.round(color.blue * 255);
     const alpha = Math.round(color.alpha * 255);
 
     const c = (n: number) => n.toString(16).padStart(2, "0");
+    const prefix = token?.isString ? "#" : "%";
     const label =
       alpha === 255
-        ? `%${c(red)}${c(green)}${c(blue)}`
-        : `%${c(red)}${c(green)}${c(blue)}${c(alpha)}`;
+        ? `${prefix}${c(red)}${c(green)}${c(blue)}`
+        : `${prefix}${c(red)}${c(green)}${c(blue)}${c(alpha)}`;
 
     return [{ label }];
   });
