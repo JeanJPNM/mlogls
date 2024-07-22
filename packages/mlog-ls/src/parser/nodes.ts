@@ -15,6 +15,7 @@ import {
   createOverloadDescriptor,
   createSingleDescriptor,
   DataOf,
+  getTargetToken,
   InstructionDescriptor,
   InstructionParameter,
 } from "./descriptors";
@@ -1989,17 +1990,4 @@ export function getSyntaxNodes(lines: TokenLine[]) {
   }
 
   return nodes;
-}
-
-function getTargetToken(character: number, tokens: TextToken[]) {
-  // return the first token that contains the offset
-  // or the next token after it
-  // this allows the completion handlers
-  // to perform plain equality comparisons with their respective tokens
-  return (
-    tokens.find(
-      (token) =>
-        token.start.character <= character && character <= token.end.character
-    ) ?? tokens.find((token) => token.start.character >= character)
-  );
 }
