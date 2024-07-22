@@ -2,6 +2,9 @@
   "name": "mlogls-workspace",
   "private": true,
   "packageManager": "pnpm@8.14.3",
+  "scripts": {
+    "build:all": "pnpm -C packages/mlogls build && pnpm -C packages/mlogls-vscode build"
+  },
   "devDependencies": {
     "@types/node": "^20.5.7",
     "esbuild": "^0.23.0",
