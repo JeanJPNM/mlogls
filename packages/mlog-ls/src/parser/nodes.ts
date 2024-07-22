@@ -283,7 +283,7 @@ export class UnknownInstruction extends InstructionNode<
 export class ReadInstruction extends InstructionNode<
   DataOf<typeof ReadInstruction>
 > {
-  descriptor = RadarInstruction.descriptor;
+  descriptor = ReadInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
     name: "read",
