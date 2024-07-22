@@ -47,6 +47,7 @@ import {
   validateLabelUsage,
 } from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
+import { findRange, findRangeIndex } from "./util/range_search";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -780,11 +781,11 @@ export function startServer(options: LanguageServerOptions) {
 }
 
 function getSelectedSyntaxNodeIndex(doc: MlogDocument, position: Position) {
-  return doc.nodes.findIndex((node) => containsPosition(node, position));
+  return findRangeIndex(doc.nodes, position);
 }
 
 function getSelectedSyntaxNode(doc: MlogDocument, position: Position) {
-  return doc.nodes.find((node) => containsPosition(node, position));
+  return findRange(doc.nodes, position);
 }
 
 function* getPartiallySelectedSyntaxNodes(
