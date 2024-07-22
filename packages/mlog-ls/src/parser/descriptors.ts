@@ -476,7 +476,7 @@ export function validateParameters(
             if (param.token.isIdentifier) break;
             diagnostics.push({
               range: param.token,
-              message: "Cannot write to a literal value",
+              message: "Cannot use a literal value as an output parameter",
               code: DiagnosticCode.writingToReadOnly,
               severity: DiagnosticSeverity.Error,
             });
