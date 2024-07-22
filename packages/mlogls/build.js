@@ -20,6 +20,7 @@ const contexts = await Promise.all(
     ]),
     /** @type {esbuild.BuildOptions}  */ ({
       outdir: "dist",
+      bundle: true,
       packages: "external",
       platform: "node",
       logLevel: "info",
