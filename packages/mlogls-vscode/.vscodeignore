@@ -1,4 +1,6 @@
-# .vscode
-# node_modules
-# tsconfig.json
-# TODO: update later
+node_modules
+tsconfig.json
+src
+syntaxes/*.yaml
+build.mjs
+tsconfig.json
