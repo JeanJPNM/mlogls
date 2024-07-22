@@ -66,10 +66,6 @@ export type OverloadData<
     }[keyof T]
   | (DescriptorData<Pre> & { type: "unknown"; typeToken?: TextToken });
 
-type OverloadDescriptorData<
-  T extends { pre: SingleDescriptor; overloads: OverloadDescriptor }
-> = OverloadData<T["overloads"], T["pre"]>;
-
 export interface InstructionDescriptor<Data> {
   parse(tokens: TextToken[]): [Data, InstructionParameter[]];
   getSignatures(): SignatureInformation[];
