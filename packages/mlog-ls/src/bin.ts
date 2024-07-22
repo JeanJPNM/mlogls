@@ -44,6 +44,13 @@ yargs(hideBin(process.argv))
         ? createConnection(ProposedFeatures.all, process.stdin, process.stdout)
         : createConnection(ProposedFeatures.all);
 
+      // TODO: the svelte language server does this
+      // is it enough though?
+      if (args.stdio) {
+        // patch to prevent logs from going to stdout
+        console.log = (...args: any[]) => console.warn(...args);
+      }
+
       startServer({ connection });
     }
   )
