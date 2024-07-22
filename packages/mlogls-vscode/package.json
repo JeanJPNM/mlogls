@@ -23,7 +23,7 @@
   "main": "./dist/nodeClient.js",
   "browser": "./dist/browserClient.js",
   "scripts": {
-    "vscode:prepublish": "pnpm run build:all",
+    "vscode:prepublish": "pnpm -w run build:all",
     "build": "node build.mjs",
     "dev": "node build.mjs --watch --dev"
   },
