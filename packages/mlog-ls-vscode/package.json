@@ -19,8 +19,7 @@
   "scripts": {
     "vscode:prepublish": "pnpm -r run build",
     "build": "node build.mjs",
-    "dev": "node build.mjs --watch --dev",
-    "dev:syntax": "nodemon "
+    "dev": "node build.mjs --watch --dev"
   },
   "contributes": {
     "languages": [
