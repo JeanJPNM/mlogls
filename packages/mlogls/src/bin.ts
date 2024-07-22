@@ -55,5 +55,5 @@ yargs(hideBin(process.argv))
     }
   )
   .help()
-  .scriptName("mlog-ls")
+  .scriptName("mlogls")
   .parse();

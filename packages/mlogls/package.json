@@ -1,5 +1,5 @@
 {
-  "name": "mlog-ls",
+  "name": "mlogls",
   "description": "A language server for the mindustry logic programming language",
   "version": "0.1.0",
   "author": "JeanJPNM",
@@ -24,14 +24,14 @@
       "types": "./dist/server.d.ts"
     }
   },
-  "homepage": "https://github.com/JeanJPNM/mlog-ls#readme",
+  "homepage": "https://github.com/JeanJPNM/mlogls#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JeanJPNM/mlog-ls.git",
-    "directory": "packages/mlog-ls"
+    "url": "https://github.com/JeanJPNM/mlogls.git",
+    "directory": "packages/mlogls"
   },
   "bugs": {
-    "url": "https://github.com/JeanJPNM/mlog-ls/issues"
+    "url": "https://github.com/JeanJPNM/mlogls/issues"
   },
   "keywords": [
     "lsp",

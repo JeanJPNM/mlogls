@@ -1,5 +1,5 @@
 {
-  "name": "mlog-ls-vscode",
+  "name": "mlogls-vscode",
   "private": true,
   "author": "JeanJPNM",
   "license": "MIT",
@@ -49,20 +49,20 @@
       }
     ]
   },
-  "homepage": "https://github.com/JeanJPNM/mlog-ls#readme",
+  "homepage": "https://github.com/JeanJPNM/mlogls#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/JeanJPNM/mlog-ls.git",
-    "directory": "packages/mlog-ls-vscode"
+    "url": "https://github.com/JeanJPNM/mlogls.git",
+    "directory": "packages/mlogls-vscode"
   },
   "bugs": {
-    "url": "https://github.com/JeanJPNM/mlog-ls/issues"
+    "url": "https://github.com/JeanJPNM/mlogls/issues"
   },
   "devDependencies": {
     "@types/vscode": "^1.75.0",
     "chokidar": "^3.6.0",
     "js-yaml": "^4.1.0",
-    "mlog-ls": "workspace:^",
+    "mlogls": "workspace:^",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1"
   },

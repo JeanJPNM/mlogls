@@ -18,7 +18,7 @@ export async function activate(context: ExtensionContext) {
 
   const url = serverModule.toString(true);
   const worker = new Worker(url, {
-    name: "mlog-ls server",
+    name: "mlogls server",
   });
 
   const clientOptions: LanguageClientOptions = {
@@ -31,7 +31,7 @@ export async function activate(context: ExtensionContext) {
     ],
   };
 
-  client = new LanguageClient("mlog-ls", "mlog-ls", clientOptions, worker);
+  client = new LanguageClient("mlogls", "mlogls", clientOptions, worker);
 
   await client.start();
   console.log("lsp-web-extension-sample server is ready");

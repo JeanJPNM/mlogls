@@ -9,13 +9,13 @@
       "autoAttachChildProcesses": true,
       "runtimeExecutable": "${execPath}",
       "args": [
-        "--extensionDevelopmentPath=${workspaceRoot}/packages/mlog-ls-vscode"
+        "--extensionDevelopmentPath=${workspaceRoot}/packages/mlogls-vscode"
       ],
       "outFiles": [
         "${workspaceRoot}/packages/*/dist/**/*.js",
         "${workspaceRoot}/packages/*/dist/**/*.cjs"
       ],
-      "preLaunchTask": "Build mlog-ls-vscode in watch mode"
+      "preLaunchTask": "Build mlogls-vscode in watch mode"
     },
     {
       "name": "Launch Web Client",
@@ -24,14 +24,14 @@
       "sourceMaps": true,
       "debugWebWorkerHost": true,
       "args": [
-        "--extensionDevelopmentPath=${workspaceFolder}/packages/mlog-ls-vscode",
+        "--extensionDevelopmentPath=${workspaceFolder}/packages/mlogls-vscode",
         "--extensionDevelopmentKind=web"
       ],
       "outFiles": [
         "${workspaceRoot}/packages/*/dist/**/*.js",
         "${workspaceRoot}/packages/*/dist/**/*.cjs"
       ],
-      "preLaunchTask": "Build mlog-ls-vscode in watch mode"
+      "preLaunchTask": "Build mlogls-vscode in watch mode"
     }
   ]
 }

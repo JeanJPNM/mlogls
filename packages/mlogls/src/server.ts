@@ -64,10 +64,10 @@ export interface LanguageServerOptions {
 }
 
 enum Commands {
-  useJumpLabels = "mlog-ls.useJumpLabels",
-  useJumpIndexes = "mlog-ls.useJumpIndexes",
-  convertToColorLiteral = "mlog-ls.convertToColorLiteral",
-  convertToPackColor = "mlog-ls.convertToPackColor",
+  useJumpLabels = "mlogls.useJumpLabels",
+  useJumpIndexes = "mlogls.useJumpIndexes",
+  convertToColorLiteral = "mlogls.convertToColorLiteral",
+  convertToPackColor = "mlogls.convertToPackColor",
 }
 
 export function startServer(options: LanguageServerOptions) {

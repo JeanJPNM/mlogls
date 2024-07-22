@@ -18,7 +18,7 @@ importers:
         specifier: ^5.5.3
         version: 5.5.3
 
-  packages/mlog-ls:
+  packages/mlogls:
     dependencies:
       vscode-languageserver:
         specifier: ^9.0.1
@@ -34,7 +34,7 @@ importers:
         specifier: ^17.0.32
         version: 17.0.32
 
-  packages/mlog-ls-vscode:
+  packages/mlogls-vscode:
     devDependencies:
       '@types/vscode':
         specifier: ^1.75.0
@@ -45,9 +45,9 @@ importers:
       js-yaml:
         specifier: ^4.1.0
         version: 4.1.0
-      mlog-ls:
+      mlogls:
         specifier: workspace:^
-        version: link:../mlog-ls
+        version: link:../mlogls
       vscode-languageclient:
         specifier: ^9.0.1
         version: 9.0.1

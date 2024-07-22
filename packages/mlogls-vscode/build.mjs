@@ -34,7 +34,7 @@ const contexts = await Promise.all([
       "vscode",
       // we don't need to bundle these in dev mode
       // since require() works fine
-      ...(isDev ? ["mlog-ls", "vscode-languageclient"] : []),
+      ...(isDev ? ["mlogls", "vscode-languageclient"] : []),
     ],
   }),
 ]);

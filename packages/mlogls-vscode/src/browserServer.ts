@@ -4,7 +4,7 @@ import {
   ProposedFeatures,
   createConnection,
 } from "vscode-languageserver/browser";
-import { startServer } from "mlog-ls";
+import { startServer } from "mlogls";
 
 const reader = new BrowserMessageReader(self);
 const writer = new BrowserMessageWriter(self);
