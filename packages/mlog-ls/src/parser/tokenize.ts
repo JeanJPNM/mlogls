@@ -1,4 +1,5 @@
 import { Diagnostic, Position, Range } from "vscode-languageserver";
+import { DiagnosticCode } from "../protocol";
 
 export type TextTokenType =
   | "comment"
@@ -152,10 +153,11 @@ export function tokenize(chars: string) {
     }
 
     if (pos >= chars.length || chars[pos] != '"') {
-      emitError(
-        Range.create(start, getCurrentLocation()),
-        'Missing closing quote " before end of line.'
-      );
+      diagnostics.push({
+        range: Range.create(start, getCurrentLocation()),
+        message: 'Missing closing quote " before end of line.',
+        code: DiagnosticCode.unclosedString,
+      });
     }
     pos++;
     const end = getCurrentLocation();
@@ -184,10 +186,6 @@ export function tokenize(chars: string) {
     const end = getCurrentLocation();
     const endPos = pos;
     return new TextToken(start, end, chars.slice(startPos, endPos));
-  }
-
-  function emitError(range: Range, message: string) {
-    diagnostics.push({ range, message });
   }
 
   /** Apply changes after reading a list of tokens. */
@@ -231,7 +229,11 @@ export function tokenize(chars: string) {
         tokens.push(token);
 
         if (missingSpace) {
-          emitError(token, missingSpaceErrorMessage);
+          diagnostics.push({
+            range: token,
+            message: missingSpaceErrorMessage,
+            code: DiagnosticCode.missingSpace,
+          });
           missingSpace = false;
         }
 
@@ -244,7 +246,11 @@ export function tokenize(chars: string) {
         tokens.push(token);
 
         if (missingSpace) {
-          emitError(token, missingSpaceErrorMessage);
+          diagnostics.push({
+            range: token,
+            message: missingSpaceErrorMessage,
+            code: DiagnosticCode.missingSpace,
+          });
           missingSpace = false;
         }
 

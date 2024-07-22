@@ -62,6 +62,8 @@ export enum DiagnosticCode {
   labelRedeclaration = "label-redeclaration",
   unexpectedToken = "unexpected-token",
   tooManyLabels = "too-many-labels",
+  missingSpace = "missing-space",
+  unclosedString = "unclosed-string",
 }
 
 type TokenLegend<K extends string> = Record<K, number> & { keys: K[] };
