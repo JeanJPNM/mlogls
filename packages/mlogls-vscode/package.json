@@ -2,7 +2,7 @@
   "name": "mlogls-vscode",
   "private": true,
   "author": "JeanJPNM",
-  "license": "MIT",
+  "license": "GPL-3.0-only",
   "version": "0.1.0",
   "publisher": "JeanJPNM",
   "categories": [
