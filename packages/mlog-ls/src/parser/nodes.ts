@@ -1,8 +1,13 @@
 import {
+  CodeAction,
+  CodeActionKind,
+  Command,
   CompletionItem,
+  Diagnostic,
   DiagnosticSeverity,
   Range,
   SignatureHelp,
+  TextEdit,
 } from "vscode-languageserver";
 import {
   ParserDiagnostic,
@@ -21,6 +26,7 @@ import {
 } from "./descriptors";
 import { counterVar } from "../constants";
 import { CompletionContext, TokenSemanticData } from "../analysis";
+import { MlogDocument } from "../document";
 
 export abstract class SyntaxNode {
   isInstruction = true;
@@ -54,6 +60,12 @@ export abstract class SyntaxNode {
   }
 
   provideTokenSemantics(tokens: TokenSemanticData[]): void {}
+
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {}
 
   abstract provideSignatureHelp(character: number): SignatureHelp;
 }
@@ -113,6 +125,25 @@ export class LabelDeclaration extends SyntaxNode {
     });
   }
 
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {
+    if (diagnostic.code !== DiagnosticCode.unexpectedToken) return;
+
+    actions.push({
+      title: "Remove token",
+      kind: CodeActionKind.QuickFix,
+      isPreferred: true,
+      edit: {
+        changes: {
+          [doc.uri]: [TextEdit.del(diagnostic.range)],
+        },
+      },
+    });
+  }
+
   provideSignatureHelp(): SignatureHelp {
     return { signatures: [] };
   }
@@ -144,6 +175,37 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
 
   provideTokenSemantics(tokens: TokenSemanticData[]): void {
     this.descriptor.provideTokenSemantics(this.parameters, tokens);
+  }
+
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {
+    switch (diagnostic.code) {
+      case DiagnosticCode.ignoredValue:
+        actions.push({
+          title: "Replace with _",
+          edit: {
+            changes: {
+              [doc.uri]: [TextEdit.replace(diagnostic.range, "_")],
+            },
+          },
+          kind: CodeActionKind.QuickFix,
+        });
+
+      case DiagnosticCode.unusedParameter:
+        actions.push({
+          title: "Remove parameter",
+          isPreferred: true,
+          edit: {
+            changes: {
+              [doc.uri]: [TextEdit.del(diagnostic.range)],
+            },
+          },
+          kind: CodeActionKind.QuickFix,
+        });
+    }
   }
 
   provideSignatureHelp(character: number): SignatureHelp {
@@ -806,6 +868,35 @@ export class PackColorInstruction extends InstructionNode<
     }
   }
 
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {
+    if (diagnostic.code !== DiagnosticCode.excessPackcolorPrecision) return;
+
+    const number = getTargetToken(
+      diagnostic.range.start.character,
+      this.line.tokens
+    );
+
+    if (!number?.isNumber) return;
+    const value = Number(number.content);
+    const newText = String(Math.round(value * 10 ** 3) / 10 ** 3);
+
+    actions.push({
+      title: "Round to 3 decimal digits",
+      kind: CodeActionKind.QuickFix,
+      isPreferred: true,
+      edit: {
+        changes: {
+          [doc.uri]: [TextEdit.replace(diagnostic.range, newText)],
+        },
+      },
+      diagnostics: [diagnostic],
+    });
+  }
+
   isConstant() {
     const { red, green, blue, alpha } = this.data;
 
@@ -1439,10 +1530,6 @@ export class FlushMessageInstruction extends InstructionNode<
     const data = FlushMessageInstruction.descriptor.parse(line.tokens);
 
     return new FlushMessageInstruction(line, ...data);
-  }
-
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
   }
 }
 

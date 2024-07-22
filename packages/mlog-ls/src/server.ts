@@ -497,6 +497,12 @@ export function startServer(options: LanguageServerOptions) {
     const actions: (CodeAction | Command)[] = [];
 
     for (const node of getPartiallySelectedSyntaxNodes(doc, start, end)) {
+      for (const diagnostic of params.context.diagnostics) {
+        if (!containsPosition(node, diagnostic.range.start)) continue;
+
+        node.provideCodeActions(doc, diagnostic, actions);
+      }
+
       if (node instanceof JumpInstruction) {
         const { destination } = node.data;
         switch (destination?.type) {
