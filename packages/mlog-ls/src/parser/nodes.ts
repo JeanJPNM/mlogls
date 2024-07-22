@@ -805,6 +805,34 @@ export class PackColorInstruction extends InstructionNode<
       }
     }
   }
+
+  isConstant() {
+    const { red, green, blue, alpha } = this.data;
+
+    if (red && !red.isNumber) return false;
+    if (green && !green.isNumber) return false;
+    if (blue && !blue.isNumber) return false;
+    if (alpha && !alpha.isNumber) return false;
+
+    return true;
+  }
+
+  getColor() {
+    const { data } = this;
+    let red = 0;
+    if (data.red?.isNumber) red = Number(data.red.content);
+
+    let green = 0;
+    if (data.green?.isNumber) green = Number(data.green.content);
+
+    let blue = 0;
+    if (data.blue?.isNumber) blue = Number(data.blue.content);
+
+    let alpha = 1;
+    if (data.alpha?.isNumber) alpha = Number(data.alpha.content);
+
+    return { red, green, blue, alpha };
+  }
 }
 
 export class EndInstruction extends InstructionNode<

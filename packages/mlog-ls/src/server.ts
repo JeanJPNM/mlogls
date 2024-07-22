@@ -29,6 +29,7 @@ import {
   JumpInstruction,
   LabelDeclaration,
   PackColorInstruction,
+  SetInstruction,
   getInstructionNames,
 } from "./parser/nodes";
 import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
@@ -56,6 +57,8 @@ export interface LanguageServerOptions {
 enum Commands {
   useJumpLabels = "mlog-ls.useJumpLabels",
   useJumpIndexes = "mlog-ls.useJumpIndexes",
+  convertToColorLiteral = "mlog-ls.convertToColorLiteral",
+  convertToPackColor = "mlog-ls.convertToPackColor",
 }
 
 export function startServer(options: LanguageServerOptions) {
@@ -89,6 +92,72 @@ export function startServer(options: LanguageServerOptions) {
       connection.workspace.applyEdit({
         changes: {
           [textDocument.uri]: convertToNumberedJumps(doc),
+        },
+      });
+    },
+    convertToColorLiteral(
+      textDocument: TextDocumentIdentifier,
+      start: Position
+    ) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+      const node = getSelectedSyntaxNode(doc, start);
+
+      if (!(node instanceof PackColorInstruction)) return;
+
+      if (!node.isConstant()) return;
+      const { data } = node;
+      const { result } = data;
+      const color = node.getColor();
+
+      const red = Math.round(color.red * 255);
+      const green = Math.round(color.green * 255);
+      const blue = Math.round(color.blue * 255);
+      const alpha = Math.round(color.alpha * 255);
+
+      if (!data.red) return;
+      const last = data.alpha ?? data.blue ?? data.green ?? data.red;
+
+      const c = (n: number) => n.toString(16).padStart(2, "0");
+      const literal =
+        alpha === 255
+          ? `%${c(red)}${c(green)}${c(blue)}`
+          : `%${c(red)}${c(green)}${c(blue)}${c(alpha)}`;
+
+      const newText = `set ${result!.content} ${literal}`;
+      connection.workspace.applyEdit({
+        changes: {
+          [textDocument.uri]: [
+            // using last.end instead of node.end to preserve comments
+            TextEdit.replace(Range.create(node.start, last.end), newText),
+          ],
+        },
+      });
+    },
+    convertToPackColor(textDocument: TextDocumentIdentifier, start: Position) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+      const node = getSelectedSyntaxNode(doc, start);
+
+      if (!(node instanceof SetInstruction)) return;
+
+      const { variable, value } = node.data;
+
+      if (!value?.isColorLiteral) return;
+
+      const { red, green, blue, alpha } = parseColor(value.content.slice(1));
+
+      const c = (value: number) => Math.round(value * 10 ** 3) / 10 ** 3;
+
+      const newText = `packcolor ${variable!.content} ${c(red)} ${c(green)} ${c(
+        blue
+      )} ${c(alpha)}`;
+      connection.workspace.applyEdit({
+        changes: {
+          [textDocument.uri]: [
+            // using last.end instead of node.end to preserve comments
+            TextEdit.replace(Range.create(node.start, value.end), newText),
+          ],
         },
       });
     },
@@ -195,22 +264,16 @@ export function startServer(options: LanguageServerOptions) {
 
     for (const node of nodes) {
       if (node instanceof PackColorInstruction) {
-        const { red, green, blue, alpha } = node.data;
-        if (!red) continue;
-        if (green && !green.isNumber) continue;
-        if (blue && !blue.isNumber) continue;
-        if (alpha && !alpha.isNumber) continue;
+        if (!node.isConstant()) continue;
+        const { data } = node;
+        if (!data.red) continue;
+        const { red, green, blue, alpha } = node.getColor();
 
-        const last = alpha ?? blue ?? green ?? red;
+        const last = data.alpha ?? data.blue ?? data.green ?? data.red;
 
         colors.push({
-          color: {
-            red: Number(red?.content) || 0,
-            green: Number(green?.content) || 0,
-            blue: Number(blue?.content) || 0,
-            alpha: Number(alpha?.content) || 1,
-          },
-          range: Range.create(red.start, last.end),
+          color: { red, green, blue, alpha },
+          range: Range.create(data.red.start, last.end),
         });
 
         continue;
@@ -398,6 +461,29 @@ export function startServer(options: LanguageServerOptions) {
         }
       } else if (node instanceof LabelDeclaration) {
         hasLabelJump = true;
+      } else if (node instanceof PackColorInstruction) {
+        const { red, green, blue, alpha } = node.data;
+        if (!red) continue;
+        if (green && !green.isNumber) continue;
+        if (blue && !blue.isNumber) continue;
+        if (alpha && !alpha.isNumber) continue;
+
+        actions.push({
+          title: "Convert to color literal",
+          kind: CodeActionKind.Refactor,
+          arguments: [params.textDocument, node.start],
+          command: Commands.convertToColorLiteral,
+        });
+      } else if (node instanceof SetInstruction) {
+        const { value } = node.data;
+        if (!value?.isColorLiteral) continue;
+
+        actions.push({
+          title: "Convert to packcolor instruction",
+          kind: CodeActionKind.Refactor,
+          arguments: [params.textDocument, node.start],
+          command: Commands.convertToPackColor,
+        });
       }
     }
 
@@ -405,11 +491,8 @@ export function startServer(options: LanguageServerOptions) {
       actions.push({
         title: "Use indexes for all jumps",
         kind: CodeActionKind.RefactorRewrite,
-        command: {
-          command: Commands.useJumpIndexes,
-          title: "Use indexes for all jumps",
-          arguments: [textDocument],
-        },
+        command: Commands.useJumpIndexes,
+        arguments: [textDocument],
       });
     }
 
@@ -417,11 +500,8 @@ export function startServer(options: LanguageServerOptions) {
       actions.push({
         title: "Use labels for all jumps",
         kind: CodeActionKind.RefactorRewrite,
-        command: {
-          command: Commands.useJumpLabels,
-          title: "Use labels for all jumps",
-          arguments: [textDocument],
-        },
+        command: Commands.useJumpLabels,
+        arguments: [textDocument],
       });
     }
 
@@ -446,6 +526,20 @@ export function startServer(options: LanguageServerOptions) {
 
         commands.convertToIndexes(textDocument);
         break;
+      }
+
+      case Commands.convertToColorLiteral: {
+        const [textDocument, start] = params.arguments ?? [];
+        if (!TextDocumentIdentifier.is(textDocument) || !Position.is(start))
+          return;
+        commands.convertToColorLiteral(textDocument, start);
+      }
+
+      case Commands.convertToPackColor: {
+        const [textDocument, start] = params.arguments ?? [];
+        if (!TextDocumentIdentifier.is(textDocument) || !Position.is(start))
+          return;
+        commands.convertToPackColor(textDocument, start);
       }
     }
   });
