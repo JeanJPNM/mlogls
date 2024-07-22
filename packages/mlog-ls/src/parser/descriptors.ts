@@ -9,7 +9,7 @@ import {
 import { ParserDiagnostic, TextToken } from "./tokenize";
 import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
 import { CompletionContext, TokenSemanticData } from "../analysis";
-import { builtinGlobalsSet, counterVar } from "../constants";
+import { builtinGlobalsSet, counterVar, keywords } from "../constants";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -477,6 +477,25 @@ export function validateParameters(
           tags: [DiagnosticTag.Unnecessary],
         });
         break;
+      case ParameterUsage.write:
+        if (keywords.includes(param.token.content)) {
+          diagnostics.push({
+            range: param.token,
+            message: "Cannot use a keyword as an output parameter",
+            code: DiagnosticCode.writingToReadOnly,
+            severity: DiagnosticSeverity.Error,
+          });
+        } else if (
+          param.token.content != counterVar &&
+          builtinGlobalsSet.has(param.token.content)
+        ) {
+          diagnostics.push({
+            range: param.token,
+            message: "Cannot write to a read-only variable",
+            severity: DiagnosticSeverity.Error,
+            code: DiagnosticCode.writingToReadOnly,
+          });
+        }
     }
   }
 }
