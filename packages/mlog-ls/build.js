@@ -15,6 +15,7 @@ const contexts = await Promise.all(
         logLevel: "info",
         sourcemap: isDev,
         entryPoints: ["src/server.ts"],
+        target: "es2020",
       },
     ]),
     /** @type {esbuild.BuildOptions}  */ ({
@@ -24,6 +25,7 @@ const contexts = await Promise.all(
       logLevel: "info",
       sourcemap: isDev,
       entryPoints: ["src/bin.ts"],
+      target: "es2020",
       format: "cjs",
       outExtension: {
         ".js": ".cjs",
