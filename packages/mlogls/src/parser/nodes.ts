@@ -190,6 +190,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
           },
           kind: CodeActionKind.QuickFix,
         });
+        break;
 
       case DiagnosticCode.unusedParameter:
         actions.push({
