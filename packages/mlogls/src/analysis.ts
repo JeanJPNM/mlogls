@@ -15,7 +15,7 @@ import {
 import { ParserDiagnostic, ParserPosition, TextToken } from "./parser/tokenize";
 import { MlogDocument } from "./document";
 import { DiagnosticCode } from "./protocol";
-import { buildingLinkNames, maxLabelCount } from "./constants";
+import { buildingLinkNames, counterVar, maxLabelCount } from "./constants";
 
 export interface TokenSemanticData {
   token: TextToken;
@@ -89,7 +89,8 @@ export function declaredVariables(nodes: SyntaxNode[]) {
       if (
         param.type !== ParameterType.variable ||
         param.usage !== ParameterUsage.write ||
-        !param.token.isIdentifier
+        !param.token.isIdentifier ||
+        param.token.content === counterVar
       )
         continue;
       variables.add(param.token.content);
