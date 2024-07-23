@@ -29,6 +29,10 @@ export const globalReadonlyVariables = [
   "@ctrlPlayer",
   "@ctrlProcessor",
   "@ctrlCommand",
+  "@itemCount",
+  "@liquidCount",
+  "@unitCount",
+  "@blockCount",
 ];
 
 export const counterVar = "@counter";
