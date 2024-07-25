@@ -1,0 +1,25 @@
+scopeName: markdown.mlog.codeblock
+fileTypes: []
+injectionSelector: "L:text.html.markdown"
+patterns:
+  - include: "#mlog-code-block"
+repository:
+  mlog-code-block:
+    name: markup.fenced_code.block.markdown
+    begin: (^|\G)(\s*)(\`{3,}|~{3,})\s*(?i:(mlog)(\s+[^`~]*)?$)
+    end: (^|\G)(\2|\s{0,3})(\3)\s*$
+
+    beginCaptures:
+      3: { name: punctuation.definition.markdown }
+      4: { name: fenced_code.block.language }
+      5: { name: fenced_code.block.language.attributes }
+
+    endCaptures:
+      3: { name: punctuation.definition.markdown }
+
+    patterns:
+      - begin: (^|\G)(\s*)(.*)
+        while: (^|\G)(?!\s*([`~]{3,})\s*$)
+        contentName: meta.embedded.block.mlog
+        patterns:
+          - include: source.mlog

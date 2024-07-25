@@ -48,6 +48,16 @@
         "language": "mlog",
         "scopeName": "source.mlog",
         "path": "./syntaxes/mlog.tmLanguage.json"
+      },
+      {
+        "scopeName": "markdown.mlog.codeblock",
+        "path": "./syntaxes/markdown-mlog.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ],
+        "embeddedLanguages": {
+          "meta.embedded.block.mlog": "mlog"
+        }
       }
     ]
   },

@@ -4,7 +4,7 @@ import chokidar from "chokidar";
 import jsYaml from "js-yaml";
 import * as fs from "node:fs/promises";
 
-const syntaxFile = "syntaxes/mlog.tmLanguage.yaml";
+const syntaxDir = "syntaxes";
 
 const watchMode = process.argv.includes("--watch");
 const isDev = process.argv.includes("--dev");
@@ -41,24 +41,30 @@ const contexts = await Promise.all([
 
 console.log("building...");
 if (watchMode) {
-  const watcher = chokidar.watch(syntaxFile, {
+  const watcher = chokidar.watch(syntaxDir, {
     atomic: true,
+    ignored: /.*\.json$/,
   });
 
-  watcher.on("change", buildLanguageSyntax).on("ready", buildLanguageSyntax);
+  watcher.on("change", buildLanguageSyntax).on("ready", async () => {
+    const syntaxFiles = await getSyntaxFiles();
+    await Promise.all(syntaxFiles.map(buildLanguageSyntax));
+  });
 
   await Promise.all(contexts.map((context) => context.watch()));
 } else {
+  const syntaxFiles = await getSyntaxFiles();
   await Promise.all([
     ...contexts.map((context) => context.rebuild()),
-    buildLanguageSyntax(),
+    ...syntaxFiles.map(buildLanguageSyntax),
   ]);
   await Promise.all(contexts.map((context) => context.dispose()));
 
   console.log("done");
 }
 
-async function buildLanguageSyntax() {
+/** @param {string} syntaxFile */
+async function buildLanguageSyntax(syntaxFile) {
   if (watchMode) {
     console.log(`[watch] build started (${syntaxFile})`);
   }
@@ -70,7 +76,7 @@ async function buildLanguageSyntax() {
       onWarning: console.warn,
     });
 
-    const jsonPath = syntaxFile.replace(".yaml", ".json");
+    const jsonPath = syntaxFile.replace(/\.yaml$/, ".json");
 
     await fs.writeFile(jsonPath, JSON.stringify(json, null, 2));
     if (watchMode) {
@@ -81,4 +87,12 @@ async function buildLanguageSyntax() {
   } catch (e) {
     console.error(e);
   }
+}
+
+async function getSyntaxFiles() {
+  const names = await fs.readdir("syntaxes");
+
+  return names
+    .filter((name) => name.endsWith(".yaml"))
+    .map((name) => `syntaxes/${name}`);
 }
