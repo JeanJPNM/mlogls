@@ -207,6 +207,7 @@ export function startServer(options: LanguageServerOptions) {
         },
         documentSymbolProvider: true,
         foldingRangeProvider: true,
+        hoverProvider: true,
       },
     };
 
@@ -933,6 +934,20 @@ export function startServer(options: LanguageServerOptions) {
     }
 
     return ranges;
+  });
+
+  connection.onHover((params) => {
+    const doc = documents.get(params.textDocument.uri);
+
+    if (!doc) return;
+
+    const { position } = params;
+
+    const node = getSelectedSyntaxNode(doc, position);
+
+    if (!node) return;
+
+    return node.provideHover(params.position.character);
   });
 
   documents.onDidChangeContent((change) => {

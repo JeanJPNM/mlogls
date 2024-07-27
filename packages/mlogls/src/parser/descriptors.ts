@@ -3,6 +3,9 @@ import {
   CompletionItemKind,
   DiagnosticSeverity,
   DiagnosticTag,
+  Hover,
+  MarkupContent,
+  MarkupKind,
   ParameterInformation,
   SignatureInformation,
 } from "vscode-languageserver";
@@ -97,6 +100,12 @@ export interface InstructionDescriptor<Data> {
     params: InstructionParameter[],
     tokens: TokenSemanticData[]
   ): void;
+
+  provideHover(
+    data: Data,
+    character: number,
+    tokens: TextToken[]
+  ): Hover | undefined;
 }
 
 export type DataOf<Inst> = Inst extends {
@@ -137,6 +146,18 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       validateParameters(parameters, diagnostics);
     },
     provideTokenSemantics: provideSemantics,
+    provideHover(data, character, tokens) {
+      const token = getTargetToken(character, tokens);
+      if (!token) return;
+
+      const name = getActiveParameterName(data, token);
+      if (!name) return;
+
+      return {
+        contents: createHoverString(`parameter <${name}>`),
+        range: token,
+      };
+    },
   };
 }
 
@@ -307,6 +328,19 @@ export function createOverloadDescriptor<
       validateParameters(parameters, diagnostics);
     },
     provideTokenSemantics: provideSemantics,
+    provideHover(data, character, tokens) {
+      const token = getTargetToken(character, tokens);
+
+      if (!token || token === data.typeToken) return;
+
+      const name = getActiveParameterName(data, token);
+      if (!name) return;
+
+      return {
+        contents: createHoverString(`parameter <${name}>`),
+        range: token,
+      };
+    },
   };
 }
 
@@ -526,6 +560,15 @@ function getActiveParameter(
   return index;
 }
 
+function getActiveParameterName(
+  members: Record<string, TextToken | undefined>,
+  targetToken: TextToken | undefined
+): string | undefined {
+  for (const key in members) {
+    if (members[key] === targetToken) return key;
+  }
+}
+
 export function getTargetToken(character: number, tokens: TextToken[]) {
   // return the first token that contains the offset
   // or the next token after it
@@ -603,4 +646,11 @@ function provideSemantics(
         });
     }
   }
+}
+
+function createHoverString(headerCode: string): MarkupContent {
+  return {
+    kind: MarkupKind.Markdown,
+    value: "```mlog\n" + headerCode + "\n```\n",
+  };
 }
