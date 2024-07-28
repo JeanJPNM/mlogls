@@ -14,9 +14,6 @@ const tokenTypes = [
   "enum",
   "typeParameter",
   "parameter",
-  "variable",
-  "property",
-  "enumMember",
   "event",
   "operator",
   "modifier",
@@ -24,7 +21,6 @@ const tokenTypes = [
   "string",
   "number",
   "regexp",
-  "operator",
 ] as const;
 
 export type SemanticTokenType = (typeof tokenTypes)[number];
