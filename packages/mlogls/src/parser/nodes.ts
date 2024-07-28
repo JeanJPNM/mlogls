@@ -20,7 +20,7 @@ import {
   InstructionDescriptor,
   InstructionParameter,
 } from "./descriptors";
-import { colorData, counterVar } from "../constants";
+import { counterVar } from "../constants";
 import { CompletionContext, TokenSemanticData } from "../analysis";
 import { MlogDocument } from "../document";
 import { ParserPosition, TextToken } from "./tokens";
@@ -45,6 +45,27 @@ export abstract class SyntaxNode {
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.lineTooLong,
       });
+    }
+
+    for (const token of this.line.tokens) {
+      if (!token.isString()) continue;
+
+      for (const tag of token.colorTags) {
+        if (tag.nameStart === tag.nameEnd || tag.color) continue;
+
+        const name = token.content.slice(tag.nameStart, tag.nameEnd);
+        diagnostics.push({
+          range: Range.create(
+            token.start.line,
+            token.start.character + tag.nameStart,
+            token.start.line,
+            token.start.character + tag.nameEnd
+          ),
+          message: `Unknown color name: ${name}`,
+          severity: DiagnosticSeverity.Warning,
+          code: DiagnosticCode.unknownColorName,
+        });
+      }
     }
   }
 
