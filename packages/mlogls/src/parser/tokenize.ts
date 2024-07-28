@@ -56,6 +56,7 @@ export function tokenize(chars: string) {
         break;
       case ";":
       case " ":
+      case "\t":
       case "\r":
         pos++; //skip newlines and spaces
         break;
