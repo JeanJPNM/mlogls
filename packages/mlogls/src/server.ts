@@ -407,6 +407,34 @@ export function startServer(options: LanguageServerOptions) {
       } satisfies CompletionList;
     }
 
+    // provide completions for string color tags
+    if (selectedToken?.isString()) {
+      const offset = position.character - selectedToken.start.character;
+      for (const tag of selectedToken.colorTags) {
+        if (tag.nameStart > offset || tag.nameEnd < offset) continue;
+
+        const completions = CompletionList.create();
+
+        completions.itemDefaults = {
+          editRange: Range.create(
+            selectedToken.start.line,
+            selectedToken.start.character + tag.nameStart,
+            selectedToken.start.line,
+            selectedToken.start.character + tag.nameEnd
+          ),
+        };
+
+        for (const name in colorData) {
+          completions.items.push({
+            label: name,
+            kind: CompletionItemKind.Color,
+          });
+        }
+
+        return completions;
+      }
+    }
+
     const context: CompletionContext = {
       getVariableCompletions() {
         const completions: CompletionItem[] = [];
@@ -458,14 +486,14 @@ export function startServer(options: LanguageServerOptions) {
       },
     };
 
-    const completionList = CompletionList.create(
+    const completions = CompletionList.create(
       node.provideCompletionItems(context, position.character)
     );
 
-    completionList.itemDefaults = {
+    completions.itemDefaults = {
       editRange: range,
     };
-    return completionList;
+    return completions;
   });
 
   connection.onSignatureHelp((params) => {
