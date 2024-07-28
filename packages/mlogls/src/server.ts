@@ -316,7 +316,7 @@ export function startServer(options: LanguageServerOptions) {
             }
 
             const start = token.start.character + tag.nameStart;
-            const end = start + tag.nameEnd;
+            const end = token.start.character + tag.nameEnd;
 
             const color = parseColor(toParse);
 
