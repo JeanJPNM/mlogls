@@ -5,6 +5,7 @@ import {
   CompletionItem,
   Diagnostic,
   DiagnosticSeverity,
+  Hover,
   Range,
   SignatureHelp,
   TextEdit,
@@ -13,7 +14,6 @@ import {
   ParserDiagnostic,
   ParserPosition,
   TextToken,
-  TextTokenType,
   TokenLine,
 } from "./tokenize";
 import { DiagnosticCode, TokenTypes } from "../protocol";
@@ -66,6 +66,10 @@ export abstract class SyntaxNode {
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {}
+
+  provideHover(character: number): Hover | undefined {
+    return;
+  }
 
   abstract provideSignatureHelp(character: number): SignatureHelp;
 }
@@ -204,6 +208,10 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
           kind: CodeActionKind.QuickFix,
         });
     }
+  }
+
+  provideHover(character: number): Hover | undefined {
+    return this.descriptor.provideHover(this.data, character, this.line.tokens);
   }
 
   provideSignatureHelp(character: number): SignatureHelp {
