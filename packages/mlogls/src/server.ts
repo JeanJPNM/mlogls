@@ -29,7 +29,7 @@ import {
   colorsSet,
   keywords,
 } from "./constants";
-import { ParserDiagnostic, TextTokenType, parseColor } from "./parser/tokenize";
+import { ParserDiagnostic, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
   CommentLine,
@@ -153,7 +153,7 @@ export function startServer(options: LanguageServerOptions) {
 
       const { variable, value } = node.data;
 
-      if (!value?.isColorLiteral) return;
+      if (!value?.isColorLiteral()) return;
 
       const { red, green, blue, alpha } = parseColor(value.content.slice(1));
 
@@ -242,16 +242,14 @@ export function startServer(options: LanguageServerOptions) {
 
       let tokenModifiers = modifiers ?? 0;
 
-      if (token.isComment) {
+      if (token.isComment()) {
         tokenType = TokenTypes.comment;
-      } else if (token.isColorLiteral || token.isNumber) {
+      } else if (token.isColorLiteral() || token.isNumber()) {
         tokenType = TokenTypes.number;
-      } else if (token.isString) {
+      } else if (token.isString()) {
         tokenType = TokenTypes.string;
       } else if (!type && token.content.startsWith("@")) {
         tokenModifiers = TokenModifiers.readonly;
-      } else if (token.isLabel) {
-        tokenType = TokenTypes.function;
       }
 
       data.push(deltaLine);
@@ -291,7 +289,7 @@ export function startServer(options: LanguageServerOptions) {
       }
 
       for (const token of node.line.tokens) {
-        if (token.isIdentifier && colorsSet.has(token.content)) {
+        if (token.isIdentifier() && colorsSet.has(token.content)) {
           // remove the leading @
           const name = token.content.slice(1);
           const color = parseColor(colorData[name]);
@@ -300,30 +298,38 @@ export function startServer(options: LanguageServerOptions) {
             range: Range.create(token.start, token.end),
             color,
           });
-        } else if (token.isColorLiteral) {
-          const color = parseColor(token.content.slice(1));
-
+        } else if (token.isColorLiteral()) {
           colors.push({
             range: Range.create(token.start, token.end),
-            color,
+            color: {
+              red: token.red,
+              green: token.green,
+              blue: token.blue,
+              alpha: token.alpha,
+            },
           });
-        } else if (token.isString) {
-          // matches opening color tags
-          const tagPattern = /\[([^\[\]]+)\]/g;
+        } else if (token.isString()) {
+          for (const tag of token.colorTags) {
+            // skip closing tags
+            if (tag.nameStart === tag.nameEnd) continue;
 
-          let match;
-          while ((match = tagPattern.exec(token.content))) {
-            const tag = match[1];
-            const isLiteral = tag.startsWith("#");
-            if (!isLiteral && !(tag in colorData)) continue;
+            const { content } = token;
+            let toParse: string;
 
-            // exclude the openning and closing bracket
-            const start = token.start.character + match.index + 1;
-            const end = start + tag.length;
+            // tags can be color literals or color names
+            if (content[tag.nameStart] === "#") {
+              toParse = content.slice(tag.nameStart + 1, tag.nameEnd);
+            } else {
+              const name = content.slice(tag.nameStart, tag.nameEnd);
 
-            const color = isLiteral
-              ? parseColor(tag.slice(1))
-              : parseColor(colorData[tag]);
+              if (!(name in colorData)) continue;
+              toParse = colorData[name];
+            }
+
+            const start = token.start.character + tag.nameStart;
+            const end = start + tag.nameEnd;
+
+            const color = parseColor(toParse);
 
             colors.push({
               range: Range.create(
@@ -369,7 +375,7 @@ export function startServer(options: LanguageServerOptions) {
     const alpha = Math.round(color.alpha * 255);
 
     const c = (n: number) => n.toString(16).padStart(2, "0");
-    const prefix = token?.isString ? "#" : "%";
+    const prefix = token?.isString() ? "#" : "%";
     const label =
       alpha === 255
         ? `${prefix}${c(red)}${c(green)}${c(blue)}`
@@ -524,22 +530,19 @@ export function startServer(options: LanguageServerOptions) {
 
       if (node instanceof JumpInstruction) {
         const { destination } = node.data;
-        switch (destination?.type) {
-          case TextTokenType.identifier:
-            hasLabelJump = true;
-            break;
-          case TextTokenType.number:
-            hasIndexJump = true;
-            break;
+        if (destination?.isIdentifier()) {
+          hasLabelJump = true;
+        } else if (destination?.isNumber()) {
+          hasIndexJump = true;
         }
       } else if (node instanceof LabelDeclaration) {
         hasLabelJump = true;
       } else if (node instanceof PackColorInstruction) {
         const { red, green, blue, alpha } = node.data;
         if (!red) continue;
-        if (green && !green.isNumber) continue;
-        if (blue && !blue.isNumber) continue;
-        if (alpha && !alpha.isNumber) continue;
+        if (green && !green.isNumber()) continue;
+        if (blue && !blue.isNumber()) continue;
+        if (alpha && !alpha.isNumber()) continue;
 
         actions.push({
           title: "Convert to color literal",
@@ -549,7 +552,7 @@ export function startServer(options: LanguageServerOptions) {
         });
       } else if (node instanceof SetInstruction) {
         const { value } = node.data;
-        if (!value?.isColorLiteral) continue;
+        if (!value?.isColorLiteral()) continue;
 
         actions.push({
           title: "Convert to packcolor instruction",
@@ -640,7 +643,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (!selectedParameter?.token.isIdentifier) return;
+    if (!selectedParameter?.token.isIdentifier()) return;
 
     const name = selectedParameter.token.content;
 
@@ -688,7 +691,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (!selectedParameter?.token.isIdentifier) return;
+    if (!selectedParameter?.token.isIdentifier()) return;
 
     const name = selectedParameter.token.content;
 
@@ -738,7 +741,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (!selectedParameter?.token.isIdentifier) return;
+    if (!selectedParameter?.token.isIdentifier()) return;
 
     const name = selectedParameter.token.content;
 
@@ -792,7 +795,7 @@ export function startServer(options: LanguageServerOptions) {
       containsPosition(param.token, position)
     );
 
-    if (!selectedParameter?.token.isIdentifier) return;
+    if (!selectedParameter?.token.isIdentifier()) return;
 
     const name = selectedParameter.token.content;
 

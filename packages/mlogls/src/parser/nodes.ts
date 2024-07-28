@@ -10,12 +10,7 @@ import {
   SignatureHelp,
   TextEdit,
 } from "vscode-languageserver";
-import {
-  ParserDiagnostic,
-  ParserPosition,
-  TextToken,
-  TokenLine,
-} from "./tokenize";
+import { ParserDiagnostic, TokenLine } from "./tokenize";
 import { DiagnosticCode, TokenTypes } from "../protocol";
 import {
   createOverloadDescriptor,
@@ -28,6 +23,7 @@ import {
 import { counterVar } from "../constants";
 import { CompletionContext, TokenSemanticData } from "../analysis";
 import { MlogDocument } from "../document";
+import { ParserPosition, TextToken } from "./tokens";
 
 export abstract class SyntaxNode {
   start: ParserPosition;
@@ -108,7 +104,7 @@ export class LabelDeclaration extends SyntaxNode {
     const { tokens } = this.line;
 
     let tokenCount = tokens.length;
-    if (tokens[tokens.length - 1].isComment) {
+    if (tokens[tokens.length - 1].isComment()) {
       tokenCount--;
     }
 
@@ -846,8 +842,8 @@ export class PackColorInstruction extends InstructionNode<
 
     for (const token of [red, green, blue, alpha]) {
       if (!token) continue;
-      if (!token.isNumber) continue;
-      const value = Number(token.content);
+      if (!token.isNumber()) continue;
+      const { value } = token;
 
       if (value < 0 || value > 1) {
         diagnostics.push({
@@ -886,8 +882,8 @@ export class PackColorInstruction extends InstructionNode<
       this.line.tokens
     );
 
-    if (!number?.isNumber) return;
-    const value = Number(number.content);
+    if (!number?.isNumber()) return;
+    const { value } = number;
     const newText = String(Math.round(value * 10 ** 3) / 10 ** 3);
 
     actions.push({
@@ -906,10 +902,10 @@ export class PackColorInstruction extends InstructionNode<
   isConstant() {
     const { red, green, blue, alpha } = this.data;
 
-    if (red && !red.isNumber) return false;
-    if (green && !green.isNumber) return false;
-    if (blue && !blue.isNumber) return false;
-    if (alpha && !alpha.isNumber) return false;
+    if (red && !red.isNumber()) return false;
+    if (green && !green.isNumber()) return false;
+    if (blue && !blue.isNumber()) return false;
+    if (alpha && !alpha.isNumber()) return false;
 
     return true;
   }
@@ -917,16 +913,16 @@ export class PackColorInstruction extends InstructionNode<
   getColor() {
     const { data } = this;
     let red = 0;
-    if (data.red?.isNumber) red = Number(data.red.content);
+    if (data.red?.isNumber()) red = Number(data.red.content);
 
     let green = 0;
-    if (data.green?.isNumber) green = Number(data.green.content);
+    if (data.green?.isNumber()) green = Number(data.green.content);
 
     let blue = 0;
-    if (data.blue?.isNumber) blue = Number(data.blue.content);
+    if (data.blue?.isNumber()) blue = Number(data.blue.content);
 
     let alpha = 1;
-    if (data.alpha?.isNumber) alpha = Number(data.alpha.content);
+    if (data.alpha?.isNumber()) alpha = Number(data.alpha.content);
 
     return { red, green, blue, alpha };
   }
@@ -2090,8 +2086,9 @@ export function getInstructionNames() {
 function parseLine(line: TokenLine) {
   const [first] = line.tokens;
 
-  if (first.isComment) return new CommentLine(line);
-  if (first.isLabel) return new LabelDeclaration(line);
+  if (first.isComment()) return new CommentLine(line);
+  if (first.isIdentifier() && first.content.endsWith(":"))
+    return new LabelDeclaration(line);
 
   const parse = instructionParsers[first.content];
   if (parse) return parse(line);

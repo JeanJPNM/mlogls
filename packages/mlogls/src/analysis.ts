@@ -12,10 +12,11 @@ import {
   LabelDeclaration,
   SyntaxNode,
 } from "./parser/nodes";
-import { ParserDiagnostic, ParserPosition, TextToken } from "./parser/tokenize";
+import { ParserDiagnostic } from "./parser/tokenize";
 import { MlogDocument } from "./document";
 import { DiagnosticCode } from "./protocol";
 import { buildingLinkNames, counterVar, maxLabelCount } from "./constants";
+import { ParserPosition, TextToken } from "./parser/tokens";
 
 export interface TokenSemanticData {
   token: TextToken;
@@ -89,7 +90,7 @@ export function declaredVariables(nodes: SyntaxNode[]) {
       if (
         param.type !== ParameterType.variable ||
         param.usage !== ParameterUsage.write ||
-        !param.token.isIdentifier ||
+        !param.token.isIdentifier() ||
         param.token.content === counterVar
       )
         continue;
@@ -244,7 +245,7 @@ export function validateLabelUsage(
     const { destination } = node.data;
     if (!destination) continue;
 
-    if (destination.isNumber) {
+    if (destination.isNumber()) {
       const address = Number(destination.content);
       if (address < 0 || address >= instructionCount) {
         diagnostics.push({
@@ -257,7 +258,7 @@ export function validateLabelUsage(
       continue;
     }
 
-    if (!destination.isIdentifier) continue;
+    if (!destination.isIdentifier()) continue;
 
     const label = destination.content;
     unusedLabels.delete(label);

@@ -1,62 +1,14 @@
 import { Diagnostic, Position, Range } from "vscode-languageserver";
 import { DiagnosticCode } from "../protocol";
-
-export enum TextTokenType {
-  comment,
-  string,
-  number,
-  color,
-  label,
-  identifier,
-}
-
-export class ParserPosition implements Position {
-  constructor(public line: number, public character: number) {}
-}
-
-export class TextToken {
-  type: TextTokenType;
-  constructor(
-    public start: ParserPosition,
-    public end: ParserPosition,
-    public content: string
-  ) {
-    this.type = getTextTokenType(content);
-  }
-
-  get isComment() {
-    return this.type === TextTokenType.comment;
-  }
-
-  get isString() {
-    return this.type === TextTokenType.string;
-  }
-
-  get isNumber() {
-    return this.type === TextTokenType.number;
-  }
-
-  get isColorLiteral() {
-    return this.type === TextTokenType.color;
-  }
-
-  get isLabel() {
-    return this.type === TextTokenType.label;
-  }
-
-  get isIdentifier() {
-    return this.type === TextTokenType.identifier;
-  }
-}
-
-function getTextTokenType(content: string): TextTokenType {
-  if (content.startsWith("#")) return TextTokenType.comment;
-  if (content.startsWith('"')) return TextTokenType.string;
-  if (content.startsWith("%")) return TextTokenType.color;
-  if (!isNaN(Number(content))) return TextTokenType.number;
-
-  return TextTokenType.identifier;
-}
+import {
+  ColorLiteralToken,
+  CommentToken,
+  IdentifierToken,
+  NumberToken,
+  ParserPosition,
+  StringToken,
+  TextToken,
+} from "./tokens";
 
 /**
  * A logical line of tokens. May only contain a comment token,
@@ -139,7 +91,7 @@ export function tokenize(chars: string) {
     const end = getCurrentLocation();
     const endPos = pos;
 
-    return new TextToken(start, end, chars.slice(startPos, endPos));
+    return new CommentToken(start, end, chars.slice(startPos, endPos));
   }
 
   function parseString(): TextToken {
@@ -163,7 +115,7 @@ export function tokenize(chars: string) {
     pos++;
     const end = getCurrentLocation();
     const endPos = pos;
-    return new TextToken(start, end, chars.slice(startPos, endPos));
+    return new StringToken(start, end, chars.slice(startPos, endPos));
   }
 
   function parseToken(): TextToken {
@@ -186,16 +138,15 @@ export function tokenize(chars: string) {
 
     const end = getCurrentLocation();
     const endPos = pos;
-    return new TextToken(start, end, chars.slice(startPos, endPos));
+    const content = chars.slice(startPos, endPos);
+    if (content.startsWith("%"))
+      return new ColorLiteralToken(start, end, content);
+    if (!isNaN(Number(content))) return new NumberToken(start, end, content);
+    return new IdentifierToken(start, end, content);
   }
 
   /** Apply changes after reading a list of tokens. */
   function checkRead() {
-    // set the type of label declarations
-    if (tokens[0].isIdentifier && tokens[0].content.endsWith(":")) {
-      tokens[0].type = TextTokenType.label;
-    }
-
     if (tokens.length > 1 && tokens[0].content === "op") {
       //legacy name change
       tokens[1].content = opNameChanges[tokens[1].content] ?? tokens[1].content;

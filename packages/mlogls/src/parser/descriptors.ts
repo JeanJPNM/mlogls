@@ -9,7 +9,7 @@ import {
   ParameterInformation,
   SignatureInformation,
 } from "vscode-languageserver";
-import { ParserDiagnostic, TextToken } from "./tokenize";
+import { ParserDiagnostic } from "./tokenize";
 import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
 import {
   CompletionContext,
@@ -17,6 +17,7 @@ import {
   TokenSemanticData,
 } from "../analysis";
 import { builtinGlobalsSet, counterVar, keywords } from "../constants";
+import { TextToken } from "./tokens";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -355,7 +356,7 @@ function parseDescriptor<const T extends SingleDescriptor>(
   let i = 0;
   for (key in descriptor) {
     const token = tokens[i + offset];
-    data[key] = token?.isComment ? undefined : token;
+    data[key] = token?.isComment() ? undefined : token;
     i++;
   }
 
@@ -410,7 +411,7 @@ function parseParameters<const T extends SingleDescriptor>(
 
   for (; i < limit; i++) {
     const token = tokens[i];
-    if (token.isComment) break;
+    if (token.isComment()) break;
 
     parameters.push({
       type: ParameterType.variable,
@@ -507,7 +508,7 @@ export function validateParameters(
             });
             break;
           case ParameterType.variable:
-            if (param.token.isIdentifier) break;
+            if (param.token.isIdentifier()) break;
             diagnostics.push({
               range: param.token,
               message: "Cannot use a literal value as an output parameter",
