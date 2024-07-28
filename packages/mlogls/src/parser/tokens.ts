@@ -1,4 +1,5 @@
-import { Position } from "vscode-languageserver";
+import { Color, Position } from "vscode-languageserver";
+import { colorData } from "../constants";
 
 export class ParserPosition implements Position {
   constructor(public line: number, public character: number) {}
@@ -56,6 +57,7 @@ export class CommentToken extends TextToken {
 export interface StringTokenTag {
   nameStart: number;
   nameEnd: number;
+  color?: Color;
 }
 
 export class StringToken extends TextToken {
@@ -105,7 +107,7 @@ export class ColorLiteralToken extends TextToken {
   }
 }
 
-export function parseColor(color: string) {
+export function parseColor(color: string): Color {
   if (color.length !== 6 && color.length !== 8)
     return { red: 0, green: 0, blue: 0, alpha: 1 };
 
@@ -142,11 +144,24 @@ function parseStringColorTags(str: string): StringTokenTag[] {
           tagStart = i;
         }
         break;
-      case "]":
-        if (tagStart !== noTag) {
-          tags.push({ nameStart: tagStart + 1, nameEnd: i });
-          tagStart = noTag;
+      case "]": {
+        if (tagStart === noTag) break;
+
+        let color: Color | undefined;
+
+        // tag is color literal
+        if (str[tagStart + 1] === "#") {
+          color = parseColor(str.slice(tagStart + 2, i));
+        } else {
+          const name = str.slice(tagStart + 1, i);
+          if (name in colorData) {
+            color = parseColor(colorData[name]);
+          }
         }
+
+        tags.push({ nameStart: tagStart + 1, nameEnd: i, color });
+        tagStart = noTag;
+      }
     }
   }
 

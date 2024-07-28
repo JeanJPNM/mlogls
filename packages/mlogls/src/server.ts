@@ -299,26 +299,10 @@ export function startServer(options: LanguageServerOptions) {
           });
         } else if (token.isString()) {
           for (const tag of token.colorTags) {
-            // skip closing tags
-            if (tag.nameStart === tag.nameEnd) continue;
-
-            const { content } = token;
-            let toParse: string;
-
-            // tags can be color literals or color names
-            if (content[tag.nameStart] === "#") {
-              toParse = content.slice(tag.nameStart + 1, tag.nameEnd);
-            } else {
-              const name = content.slice(tag.nameStart, tag.nameEnd);
-
-              if (!(name in colorData)) continue;
-              toParse = colorData[name];
-            }
+            if (!tag.color) continue;
 
             const start = token.start.character + tag.nameStart;
             const end = token.start.character + tag.nameEnd;
-
-            const color = parseColor(toParse);
 
             colors.push({
               range: Range.create(
@@ -327,7 +311,7 @@ export function startServer(options: LanguageServerOptions) {
                 token.start.line,
                 end
               ),
-              color,
+              color: tag.color,
             });
           }
         }
