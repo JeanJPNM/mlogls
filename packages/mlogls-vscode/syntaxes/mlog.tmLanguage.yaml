@@ -101,7 +101,7 @@ repository:
         match: \[\[
         # matches color opening brackets like [red]
         # and their closing pairs, []
-      - match: (\[)([^\[\]]*)(\])
+      - match: (\[)([^\[\] ]*)(\])
         captures:
           1:
             name: punctuation.definition.tag.begin.mlog

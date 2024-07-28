@@ -20,7 +20,7 @@ import {
   InstructionDescriptor,
   InstructionParameter,
 } from "./descriptors";
-import { counterVar } from "../constants";
+import { colorData, counterVar } from "../constants";
 import { CompletionContext, TokenSemanticData } from "../analysis";
 import { MlogDocument } from "../document";
 import { ParserPosition, TextToken } from "./tokens";

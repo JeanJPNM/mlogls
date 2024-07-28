@@ -128,16 +128,25 @@ function parseStringColorTags(str: string): StringTokenTag[] {
   for (let i = 0; i < str.length; i++) {
     const c = str[i];
 
-    if (c === "[") {
-      // escaped bracket: [[
-      if (tagStart === i - 1) {
+    switch (c) {
+      // tags can't contain whitespace
+      case " ":
+      case "\t":
         tagStart = noTag;
-      } else {
-        tagStart = i;
-      }
-    } else if (c === "]" && tagStart !== noTag) {
-      tags.push({ nameStart: tagStart + 1, nameEnd: i });
-      tagStart = noTag;
+        break;
+      case "[":
+        // escaped bracket: [[
+        if (tagStart === i - 1) {
+          tagStart = noTag;
+        } else {
+          tagStart = i;
+        }
+        break;
+      case "]":
+        if (tagStart !== noTag) {
+          tags.push({ nameStart: tagStart + 1, nameEnd: i });
+          tagStart = noTag;
+        }
     }
   }
 
