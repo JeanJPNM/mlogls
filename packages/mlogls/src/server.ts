@@ -238,24 +238,13 @@ export function startServer(options: LanguageServerOptions) {
           ? current.character - previous.character
           : current.character;
       const length = token.end.character - token.start.character;
-      let tokenType = type ?? TokenTypes.variable;
 
-      let tokenModifiers = modifiers ?? 0;
-
-      if (token.isComment()) {
-        tokenType = TokenTypes.comment;
-      } else if (token.isColorLiteral() || token.isNumber()) {
-        tokenType = TokenTypes.number;
-      } else if (token.isString()) {
-        tokenType = TokenTypes.string;
-      } else if (!type && token.content.startsWith("@")) {
-        tokenModifiers = TokenModifiers.readonly;
-      }
+      const tokenModifiers = modifiers ?? 0;
 
       data.push(deltaLine);
       data.push(deltaStart);
       data.push(length);
-      data.push(tokenType);
+      data.push(type);
       data.push(tokenModifiers);
 
       previous = current;
