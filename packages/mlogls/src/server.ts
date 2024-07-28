@@ -18,9 +18,10 @@ import {
   DocumentSymbol,
   SymbolKind,
   FoldingRange,
+  DiagnosticSeverity,
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
-import { TokenModifiers, TokenTypes } from "./protocol";
+import { DiagnosticCode, TokenModifiers, TokenTypes } from "./protocol";
 import {
   buildingLinkNames,
   builtinGlobals,
@@ -28,6 +29,7 @@ import {
   colorData,
   colorsSet,
   keywords,
+  maxInstructionCount,
 } from "./constants";
 import { ParserDiagnostic, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
@@ -960,8 +962,22 @@ export function startServer(options: LanguageServerOptions) {
     if (!doc) return;
 
     const parserDiagnostics: ParserDiagnostic[] = [...doc.parserDiagnostics];
+
+    let instructionCount = 0;
     for (const node of doc.nodes) {
       node.provideDiagnostics(parserDiagnostics);
+      if (node instanceof InstructionNode) {
+        instructionCount++;
+
+        if (instructionCount > maxInstructionCount) {
+          parserDiagnostics.push({
+            range: node,
+            message: `Exceeded maximum instruction count of ${maxInstructionCount}`,
+            severity: DiagnosticSeverity.Error,
+            code: DiagnosticCode.tooManyInstructions,
+          });
+        }
+      }
     }
 
     validateLabelUsage(doc, parserDiagnostics);

@@ -58,6 +58,7 @@ export enum DiagnosticCode {
   labelRedeclaration = "label-redeclaration",
   unexpectedToken = "unexpected-token",
   tooManyLabels = "too-many-labels",
+  tooManyInstructions = "too-many-instructions",
   missingSpace = "missing-space",
   unclosedString = "unclosed-string",
   unknownColorName = "unknown-color-name",
