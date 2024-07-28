@@ -624,6 +624,8 @@ function provideSemantics(
         });
         break;
       case ParameterType.label:
+        if (!param.token.isIdentifier()) break;
+
         tokens.push({
           type: TokenTypes.function,
           token: param.token,
