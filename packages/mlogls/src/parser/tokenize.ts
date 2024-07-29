@@ -1,4 +1,4 @@
-import { Diagnostic, Position, Range } from "vscode-languageserver";
+import { Diagnostic, Range } from "vscode-languageserver";
 import { DiagnosticCode } from "../protocol";
 import {
   ColorLiteralToken,
@@ -11,12 +11,13 @@ import {
 } from "./tokens";
 
 /**
- * A logical line of tokens. May only contain a comment token,
- * be a label declaration or just be a regular instruction..
+ * A logical line of tokens. May only contain a comment token, be a label
+ * declaration or just be a regular instruction..
  *
  * Token lines have at least one token.
  *
- * There may be multiple token lines in a single line of code due to the use of the `;` separator.
+ * There may be multiple token lines in a single line of code due to the use of
+ * the `;` separator.
  */
 export class TokenLine {
   constructor(

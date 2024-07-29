@@ -31,12 +31,13 @@ export interface CompletionContext {
 
 export interface LabelBlock {
   /**
-   * The indentation of the label of this node.
-   * If this is the root node, this value is -1.
+   * The indentation of the label of this node. If this is the root node, this
+   * value is -1.
    */
   labelIndentation: number;
   /**
-   * The index of the label of this indentation node, unless `this` is the root node.
+   * The index of the label of this indentation node, unless `this` is the root
+   * node.
    */
   start: number;
   end: number;
@@ -47,11 +48,11 @@ export interface LabelBlock {
 export const buildingNamePattern = /([a-z]+)(\d+)/;
 
 /**
- * Returns a set of label names that are accessible
- * in the logical scope of the node at the provided index.
+ * Returns a set of label names that are accessible in the logical scope of the
+ * node at the provided index.
  *
- * Only top-level labels and all labels part of the
- * top-level block that contains the index are returned.
+ * Only top-level labels and all labels part of the top-level block that
+ * contains the index are returned.
  */
 export function findLabelsInScope(
   nodes: SyntaxNode[],
@@ -296,9 +297,9 @@ export function getLabelBlocks(nodes: SyntaxNode[]) {
   };
 
   /**
-   * Used to track the indentation of the current token line,
-   * handles cases where the ; separator
-   * is used to put multiple instructions on the same text line
+   * Used to track the indentation of the current token line, handles cases
+   * where the ; separator is used to put multiple instructions on the same text
+   * line
    */
   let lineStart: ParserPosition = {
     line: -1,
@@ -316,8 +317,6 @@ export function getLabelBlocks(nodes: SyntaxNode[]) {
     }
 
     if (node instanceof CommentLine) {
-      for (let i = 0; i < parents.length; i++) {}
-
       // only add the comment to the current block
       // if it's indentation is greater than the block's label
       if (

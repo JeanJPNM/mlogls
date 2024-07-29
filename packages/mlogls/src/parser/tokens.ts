@@ -2,7 +2,10 @@ import { Color, Position } from "vscode-languageserver";
 import { colorData } from "../constants";
 
 export class ParserPosition implements Position {
-  constructor(public line: number, public character: number) {}
+  constructor(
+    public line: number,
+    public character: number
+  ) {}
 }
 
 export abstract class TextToken {

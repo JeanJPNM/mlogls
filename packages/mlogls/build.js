@@ -18,7 +18,7 @@ const contexts = await Promise.all(
         target: "es2020",
       },
     ]),
-    /** @type {esbuild.BuildOptions}  */ ({
+    /** @type {esbuild.BuildOptions} */ ({
       outdir: "dist",
       bundle: true,
       packages: "external",
@@ -58,7 +58,6 @@ if (watchMode) {
 }
 
 /**
- *
  * @param {esbuild.BuildOptions[]} configs
  * @returns {esbuild.BuildOptions[]}
  */

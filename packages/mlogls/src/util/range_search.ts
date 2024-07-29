@@ -1,8 +1,6 @@
 import { Position, Range } from "vscode-languageserver";
 
-/**
- * Performs binary search to find a range that contains the provided position.
- */
+/** Performs binary search to find a range that contains the provided position. */
 export function findRangeIndex(ranges: Range[], position: Position): number {
   let start = 0;
   let end = ranges.length;
