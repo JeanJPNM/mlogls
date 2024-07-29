@@ -1,0 +1,8 @@
+{
+  "plugins": ["prettier-plugin-jsdoc"],
+  "endOfLine": "lf",
+  "arrowParens": "always",
+  "tabWidth": 2,
+  "printWidth": 80,
+  "trailingComma": "es5"
+}
