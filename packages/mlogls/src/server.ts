@@ -25,7 +25,6 @@ import { DiagnosticCode, TokenModifiers, TokenTypes } from "./protocol";
 import {
   buildingLinkNames,
   builtinGlobals,
-  builtinGlobalsSet,
   colorData,
   colorsSet,
   keywords,
@@ -175,7 +174,7 @@ export function startServer(options: LanguageServerOptions) {
     },
   };
 
-  connection.onInitialize((params) => {
+  connection.onInitialize(() => {
     const result: InitializeResult = {
       capabilities: {
         textDocumentSync: TextDocumentSyncKind.Incremental,
@@ -612,6 +611,7 @@ export function startServer(options: LanguageServerOptions) {
         if (!TextDocumentIdentifier.is(textDocument) || !Position.is(start))
           return;
         commands.convertToColorLiteral(textDocument, start);
+        break;
       }
 
       case Commands.convertToPackColor: {
@@ -749,7 +749,7 @@ export function startServer(options: LanguageServerOptions) {
     const name = selectedParameter.token.content;
 
     switch (selectedParameter.type) {
-      case ParameterType.variable:
+      case ParameterType.variable: {
         const locations = findVariableUsageLocations(name, doc.nodes);
 
         return {
@@ -760,7 +760,8 @@ export function startServer(options: LanguageServerOptions) {
             })),
           },
         };
-      case ParameterType.label:
+      }
+      case ParameterType.label: {
         const labelReferences = findLabelReferences(name, doc.nodes);
 
         return {
@@ -771,6 +772,7 @@ export function startServer(options: LanguageServerOptions) {
             })),
           },
         };
+      }
     }
   });
 

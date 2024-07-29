@@ -48,7 +48,7 @@ yargs(hideBin(process.argv))
       // is it enough though?
       if (args.stdio) {
         // patch to prevent logs from going to stdout
-        console.log = (...args: any[]) => console.warn(...args);
+        console.log = (...args: unknown[]) => console.warn(...args);
       }
 
       startServer({ connection });

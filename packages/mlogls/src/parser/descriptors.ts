@@ -66,7 +66,7 @@ export type DescriptorData<T extends SingleDescriptor> = Partial<
 
 export type OverloadData<
   T extends Record<string, SingleDescriptor>,
-  Pre extends SingleDescriptor = {}
+  Pre extends SingleDescriptor = Record<string, never>,
 > =
   | {
       [K in keyof T]: DescriptorData<Pre> &
@@ -164,7 +164,7 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
 
 export function createOverloadDescriptor<
   const T extends OverloadDescriptor,
-  const Pre extends SingleDescriptor = {}
+  const Pre extends SingleDescriptor = Record<string, never>,
 >({
   name,
   pre,
@@ -181,7 +181,7 @@ export function createOverloadDescriptor<
     parse(tokens: TextToken[]) {
       const preData = pre
         ? parseDescriptor(pre, tokens)
-        : ({} as any as DescriptorData<Pre>);
+        : ({} as unknown as DescriptorData<Pre>);
       const preParams = pre
         ? parseParameters(pre, tokens, 1, typeTokenIndex)
         : [];
@@ -251,7 +251,7 @@ export function createOverloadDescriptor<
       if (data.type === "unknown") return 0;
 
       let i = 0;
-      for (let current in overloads) {
+      for (const current in overloads) {
         if (current === data.type) return i;
         i++;
       }
@@ -324,8 +324,15 @@ export function createOverloadDescriptor<
         return;
       }
 
-      const descriptor = overloads[data.type];
-      validateMembers(descriptor, data as DescriptorData<{}>, diagnostics);
+      if (data.type !== "unknown") {
+        const descriptor = overloads[data.type];
+        validateMembers(
+          descriptor,
+          data as DescriptorData<typeof descriptor>,
+          diagnostics
+        );
+      }
+
       validateParameters(parameters, diagnostics);
     },
     provideTokenSemantics: provideSemantics,
@@ -632,13 +639,14 @@ function provideSemantics(
         });
         break;
       case ParameterType.readonlyGlobal:
-      case ParameterType.buildingLink: {
+      case ParameterType.buildingLink:
         tokens.push({
           token: param.token,
           type: TokenTypes.variable,
           modifiers: TokenModifiers.readonly,
         });
-      }
+        break;
+
       case ParameterType.variable:
         if (param.usage !== ParameterUsage.write) break;
 

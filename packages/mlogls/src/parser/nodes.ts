@@ -71,20 +71,20 @@ export abstract class SyntaxNode {
 
   provideCompletionItems(
     context: CompletionContext,
-    character: number
+    _character: number
   ): CompletionItem[] {
     return context.getVariableCompletions();
   }
 
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {}
+  provideTokenSemantics(_tokens: TokenSemanticData[]): void {}
 
   provideCodeActions(
-    doc: MlogDocument,
-    diagnostic: Diagnostic,
-    actions: (CodeAction | Command)[]
+    _doc: MlogDocument,
+    _diagnostic: Diagnostic,
+    _actions: (CodeAction | Command)[]
   ): void {}
 
-  provideHover(character: number): Hover | undefined {
+  provideHover(_character: number): Hover | undefined {
     return;
   }
 
@@ -101,8 +101,8 @@ export class CommentLine extends SyntaxNode {
   }
 
   provideCompletionItems(
-    context: CompletionContext,
-    character: number
+    _context: CompletionContext,
+    _character: number
   ): CompletionItem[] {
     return [];
   }
@@ -261,7 +261,7 @@ export class NoopInstruction extends InstructionNode<
     );
   }
 
-  provideSignatureHelp(character: number): SignatureHelp {
+  provideSignatureHelp(_character: number): SignatureHelp {
     return {
       signatures: [
         {
@@ -798,7 +798,7 @@ export class StopInstruction extends InstructionNode<
     );
   }
 
-  provideSignatureHelp(character: number): SignatureHelp {
+  provideSignatureHelp(_character: number): SignatureHelp {
     return {
       signatures: [
         {
