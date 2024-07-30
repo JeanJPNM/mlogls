@@ -3,6 +3,7 @@ import { startServer } from "./server";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
 
+// eslint-disable-next-line @typescript-eslint/no-floating-promises
 yargs(hideBin(process.argv))
   .command(
     "$0",

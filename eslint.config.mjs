@@ -7,7 +7,7 @@ export default tseslint.config(
   { ignores: ["**/dist/"] },
   { languageOptions: { globals: { ...globals.browser, ...globals.node } } },
   pluginJs.configs.recommended,
-  ...tseslint.configs.recommended,
+  ...tseslint.configs.recommendedTypeChecked,
   prettier,
   {
     rules: {
@@ -16,5 +16,17 @@ export default tseslint.config(
         { argsIgnorePattern: "^_" },
       ],
     },
+  },
+  {
+    languageOptions: {
+      parserOptions: {
+        project: true,
+      },
+    },
+  },
+  {
+    // disable type checked linting for config and build files
+    files: ["*.mjs", "*.js", "**/build.{js,mjs}"],
+    ...tseslint.configs.disableTypeChecked,
   }
 );

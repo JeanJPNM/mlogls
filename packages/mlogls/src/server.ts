@@ -86,27 +86,27 @@ export function startServer(options: LanguageServerOptions) {
   });
 
   const commands = {
-    convertToLabels(textDocument: TextDocumentIdentifier) {
+    async convertToLabels(textDocument: TextDocumentIdentifier) {
       const doc = documents.get(textDocument.uri);
       if (!doc) return;
 
-      connection.workspace.applyEdit({
+      await connection.workspace.applyEdit({
         changes: {
           [textDocument.uri]: convertToLabeledJumps(doc),
         },
       });
     },
-    convertToIndexes(textDocument: TextDocumentIdentifier) {
+    async convertToIndexes(textDocument: TextDocumentIdentifier) {
       const doc = documents.get(textDocument.uri);
       if (!doc) return;
 
-      connection.workspace.applyEdit({
+      await connection.workspace.applyEdit({
         changes: {
           [textDocument.uri]: convertToNumberedJumps(doc),
         },
       });
     },
-    convertToColorLiteral(
+    async convertToColorLiteral(
       textDocument: TextDocumentIdentifier,
       start: Position
     ) {
@@ -136,7 +136,7 @@ export function startServer(options: LanguageServerOptions) {
           : `%${c(red)}${c(green)}${c(blue)}${c(alpha)}`;
 
       const newText = `set ${result!.content} ${literal}`;
-      connection.workspace.applyEdit({
+      await connection.workspace.applyEdit({
         changes: {
           [textDocument.uri]: [
             // using last.end instead of node.end to preserve comments
@@ -145,7 +145,10 @@ export function startServer(options: LanguageServerOptions) {
         },
       });
     },
-    convertToPackColor(textDocument: TextDocumentIdentifier, start: Position) {
+    async convertToPackColor(
+      textDocument: TextDocumentIdentifier,
+      start: Position
+    ) {
       const doc = documents.get(textDocument.uri);
       if (!doc) return;
       const node = getSelectedSyntaxNode(doc, start);
@@ -163,7 +166,7 @@ export function startServer(options: LanguageServerOptions) {
       const newText = `packcolor ${variable!.content} ${c(red)} ${c(green)} ${c(
         blue
       )} ${c(alpha)}`;
-      connection.workspace.applyEdit({
+      await connection.workspace.applyEdit({
         changes: {
           [textDocument.uri]: [
             // using last.end instead of node.end to preserve comments
@@ -586,39 +589,40 @@ export function startServer(options: LanguageServerOptions) {
     return actions;
   });
 
-  connection.onExecuteCommand((params) => {
-    const { command } = params;
+  connection.onExecuteCommand(async (params) => {
+    const command = params.command as Commands;
+    const args: unknown[] = params.arguments ?? [];
 
     switch (command) {
       case Commands.useJumpLabels: {
-        const [textDocument] = params.arguments ?? [];
+        const [textDocument] = args;
         if (!TextDocumentIdentifier.is(textDocument)) return;
 
-        commands.convertToLabels(textDocument);
+        await commands.convertToLabels(textDocument);
         break;
       }
 
       case Commands.useJumpIndexes: {
-        const [textDocument] = params.arguments ?? [];
+        const [textDocument] = args;
         if (!TextDocumentIdentifier.is(textDocument)) return;
 
-        commands.convertToIndexes(textDocument);
+        await commands.convertToIndexes(textDocument);
         break;
       }
 
       case Commands.convertToColorLiteral: {
-        const [textDocument, start] = params.arguments ?? [];
+        const [textDocument, start] = args;
         if (!TextDocumentIdentifier.is(textDocument) || !Position.is(start))
           return;
-        commands.convertToColorLiteral(textDocument, start);
+        await commands.convertToColorLiteral(textDocument, start);
         break;
       }
 
       case Commands.convertToPackColor: {
-        const [textDocument, start] = params.arguments ?? [];
+        const [textDocument, start] = args;
         if (!TextDocumentIdentifier.is(textDocument) || !Position.is(start))
           return;
-        commands.convertToPackColor(textDocument, start);
+        await commands.convertToPackColor(textDocument, start);
       }
     }
   });
@@ -958,7 +962,7 @@ export function startServer(options: LanguageServerOptions) {
     return node.provideHover(params.position.character);
   });
 
-  documents.onDidChangeContent((change) => {
+  documents.onDidChangeContent(async (change) => {
     // TODO: add diagnostics for unused variables (script-wide)
     const doc = documents.get(change.document.uri);
     if (!doc) return;
@@ -994,15 +998,15 @@ export function startServer(options: LanguageServerOptions) {
       });
     }
 
-    connection.sendDiagnostics({ uri: doc.uri, diagnostics });
+    await connection.sendDiagnostics({ uri: doc.uri, diagnostics });
   });
 
-  documents.onDidClose((e) => {
+  documents.onDidClose(async (e) => {
     const { document } = e;
 
     // remove existing warnings and error messages
     // since each file is standalone
-    connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
+    await connection.sendDiagnostics({ uri: document.uri, diagnostics: [] });
   });
 
   // Make the text document manager listen on the connection

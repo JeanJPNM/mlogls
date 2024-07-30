@@ -9,7 +9,7 @@ import {
 
 let client: LanguageClient;
 
-export function activate(context: ExtensionContext) {
+export async function activate(context: ExtensionContext) {
   // return;
   // The server is implemented in node
   const serverModule = context.asAbsolutePath("dist/nodeServer.js");
@@ -41,7 +41,7 @@ export function activate(context: ExtensionContext) {
   client = new LanguageClient("mlogls", "mlogls", serverOptions, clientOptions);
 
   // Start the client. This will also launch the server
-  client.start();
+  await client.start();
 }
 
 export function deactivate(): Thenable<void> | undefined {

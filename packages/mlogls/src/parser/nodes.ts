@@ -254,7 +254,7 @@ export class NoopInstruction extends InstructionNode<
     descriptor: {},
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new NoopInstruction(
       line,
       ...NoopInstruction.descriptor.parse(line.tokens)
@@ -284,7 +284,7 @@ export class UnknownInstruction extends InstructionNode<
     descriptor: {},
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = UnknownInstruction.descriptor.parse(line.tokens);
     return new UnknownInstruction(line, ...data);
   }
@@ -322,7 +322,7 @@ export class ReadInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new ReadInstruction(
       line,
       ...ReadInstruction.descriptor.parse(line.tokens)
@@ -344,7 +344,7 @@ export class WriteInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new WriteInstruction(
       line,
       ...WriteInstruction.descriptor.parse(line.tokens)
@@ -447,7 +447,7 @@ export class DrawInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new DrawInstruction(
       line,
       ...DrawInstruction.descriptor.parse(line.tokens)
@@ -465,7 +465,7 @@ export class PrintInstruction extends InstructionNode<
     descriptor: { value: {} },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = PrintInstruction.descriptor.parse(line.tokens);
 
     return new PrintInstruction(line, ...data);
@@ -482,7 +482,7 @@ export class FormatInstruction extends InstructionNode<
     descriptor: { value: {} },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = FormatInstruction.descriptor.parse(line.tokens);
     return new FormatInstruction(line, ...data);
   }
@@ -498,7 +498,7 @@ export class DrawFlushInstruction extends InstructionNode<
     descriptor: { target: {} },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = DrawFlushInstruction.descriptor.parse(line.tokens);
 
     return new DrawFlushInstruction(line, ...data);
@@ -515,7 +515,7 @@ export class PrintFlushInstruction extends InstructionNode<
     descriptor: { target: {} },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new PrintFlushInstruction(
       line,
       ...PrintFlushInstruction.descriptor.parse(line.tokens)
@@ -536,7 +536,7 @@ export class GetLinkInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new GetLinkInstruction(
       line,
       ...GetLinkInstruction.descriptor.parse(line.tokens)
@@ -560,7 +560,7 @@ export class ControlInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new ControlInstruction(
       line,
       ...ControlInstruction.descriptor.parse(line.tokens)
@@ -625,7 +625,7 @@ export class RadarInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = RadarInstruction.descriptor.parse(line.tokens);
 
     return new RadarInstruction(line, ...data);
@@ -646,7 +646,7 @@ export class SensorInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new SensorInstruction(
       line,
       ...SensorInstruction.descriptor.parse(line.tokens)
@@ -667,7 +667,7 @@ export class SetInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetInstruction.descriptor.parse(line.tokens);
 
     return new SetInstruction(line, ...data);
@@ -738,7 +738,7 @@ export class OpInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new OpInstruction(
       line,
       ...OpInstruction.descriptor.parse(line.tokens)
@@ -774,7 +774,7 @@ export class WaitInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = WaitInstruction.descriptor.parse(line.tokens);
 
     return new WaitInstruction(line, ...data);
@@ -791,7 +791,7 @@ export class StopInstruction extends InstructionNode<
     descriptor: {},
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new StopInstruction(
       line,
       ...StopInstruction.descriptor.parse(line.tokens)
@@ -826,7 +826,7 @@ export class LookupInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new LookupInstruction(
       line,
       ...LookupInstruction.descriptor.parse(line.tokens)
@@ -850,7 +850,7 @@ export class PackColorInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = PackColorInstruction.descriptor.parse(line.tokens);
 
     return new PackColorInstruction(line, ...data);
@@ -959,7 +959,7 @@ export class EndInstruction extends InstructionNode<
     descriptor: {},
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     return new EndInstruction(
       line,
       ...EndInstruction.descriptor.parse(line.tokens)
@@ -989,7 +989,7 @@ export class JumpInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = JumpInstruction.descriptor.parse(line.tokens);
 
     return new JumpInstruction(line, ...data);
@@ -1021,7 +1021,7 @@ export class UnitBindInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = UnitBindInstruction.descriptor.parse(line.tokens);
 
     return new UnitBindInstruction(line, ...data);
@@ -1065,7 +1065,7 @@ export class UnitControlInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = UnitControlInstruction.descriptor.parse(line.tokens);
 
     return new UnitControlInstruction(line, ...data);
@@ -1110,7 +1110,7 @@ export class UnitRadarinstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = UnitRadarinstruction.descriptor.parse(line.tokens);
 
     return new UnitRadarinstruction(line, ...data);
@@ -1194,7 +1194,7 @@ export class UnitLocateInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = UnitLocateInstruction.descriptor.parse(line.tokens);
     return new UnitLocateInstruction(line, ...data);
   }
@@ -1231,7 +1231,7 @@ export class GetBlockInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = GetBlockInstruction.descriptor.parse(line.tokens);
 
     return new GetBlockInstruction(line, ...data);
@@ -1266,7 +1266,7 @@ export class SetBlockInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetBlockInstruction.descriptor.parse(line.tokens);
 
     return new SetBlockInstruction(line, ...data);
@@ -1290,7 +1290,7 @@ export class SpawnUnitInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SpawnUnitInstruction.descriptor.parse(line.tokens);
 
     return new SpawnUnitInstruction(line, ...data);
@@ -1310,7 +1310,7 @@ export class SenseWeatherInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SenseWeatherInstruction.descriptor.parse(line.tokens);
 
     return new SenseWeatherInstruction(line, ...data);
@@ -1330,7 +1330,7 @@ export class SetWeatherInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetWeatherInstruction.descriptor.parse(line.tokens);
 
     return new SetWeatherInstruction(line, ...data);
@@ -1394,7 +1394,7 @@ export class ApplyStatusInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = ApplyStatusInstruction.descriptor.parse(line.tokens);
 
     return new ApplyStatusInstruction(line, ...data);
@@ -1419,7 +1419,7 @@ export class SpawnWaveInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SpawnWaveInstruction.descriptor.parse(line.tokens);
 
     return new SpawnWaveInstruction(line, ...data);
@@ -1521,7 +1521,7 @@ export class SetRuleInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetRuleInstruction.descriptor.parse(line.tokens);
 
     return new SetRuleInstruction(line, ...data);
@@ -1549,7 +1549,7 @@ export class FlushMessageInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = FlushMessageInstruction.descriptor.parse(line.tokens);
 
     return new FlushMessageInstruction(line, ...data);
@@ -1576,7 +1576,7 @@ export class CutsceneInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = CutsceneInstruction.descriptor.parse(line.tokens);
 
     return new CutsceneInstruction(line, ...data);
@@ -1776,7 +1776,7 @@ export class EffectInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = EffectInstruction.descriptor.parse(line.tokens);
 
     return new EffectInstruction(line, ...data);
@@ -1803,7 +1803,7 @@ export class ExplosionInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = ExplosionInstruction.descriptor.parse(line.tokens);
 
     return new ExplosionInstruction(line, ...data);
@@ -1822,7 +1822,7 @@ export class SetRateInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetRateInstruction.descriptor.parse(line.tokens);
 
     return new SetRateInstruction(line, ...data);
@@ -1882,7 +1882,7 @@ export class FetchInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = FetchInstruction.descriptor.parse(line.tokens);
 
     return new FetchInstruction(line, ...data);
@@ -1901,7 +1901,7 @@ export class SyncInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SyncInstruction.descriptor.parse(line.tokens);
 
     return new SyncInstruction(line, ...data);
@@ -1921,7 +1921,7 @@ export class GetFlagInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = GetFlagInstruction.descriptor.parse(line.tokens);
 
     return new GetFlagInstruction(line, ...data);
@@ -1941,7 +1941,7 @@ export class SetFlagInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetFlagInstruction.descriptor.parse(line.tokens);
 
     return new SetFlagInstruction(line, ...data);
@@ -1962,7 +1962,7 @@ export class SetPropInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetPropInstruction.descriptor.parse(line.tokens);
 
     return new SetPropInstruction(line, ...data);
@@ -2001,7 +2001,7 @@ export class SetMarkerInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = SetMarkerInstruction.descriptor.parse(line.tokens);
 
     return new SetMarkerInstruction(line, ...data);
@@ -2026,7 +2026,7 @@ export class MakeMakerInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = MakeMakerInstruction.descriptor.parse(line.tokens);
 
     return new MakeMakerInstruction(line, ...data);
@@ -2045,7 +2045,7 @@ export class PrintLocaleInstruction extends InstructionNode<
     },
   });
 
-  static parse(line: TokenLine) {
+  static parse(this: void, line: TokenLine) {
     const data = PrintLocaleInstruction.descriptor.parse(line.tokens);
 
     return new PrintLocaleInstruction(line, ...data);
