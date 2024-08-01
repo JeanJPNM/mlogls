@@ -1406,15 +1406,16 @@ export class SpawnWaveInstruction extends InstructionNode<
 > {
   descriptor = SpawnWaveInstruction.descriptor;
 
-  static readonly descriptor = createOverloadDescriptor({
+  static readonly descriptor = createSingleDescriptor({
     name: "spawnwave",
-    overloads: {
-      // natural wave
-      true: {},
-      // synthetic wave
-      false: {
-        x: {},
-        y: {},
+    descriptor: {
+      x: {},
+      y: {},
+      natural: {
+        restrict: {
+          values: ["true", "false"],
+          invalidPrefix: "Invalid spawnwave natural value: ",
+        },
       },
     },
   });
