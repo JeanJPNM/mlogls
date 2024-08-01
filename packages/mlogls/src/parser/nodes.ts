@@ -1144,7 +1144,7 @@ export class UnitLocateInstruction extends InstructionNode<
           },
         },
         _enemy: {},
-        ore: { isOutput: true },
+        ore: {},
         x: { isOutput: true },
         y: { isOutput: true },
         found: { isOutput: true },
