@@ -44,7 +44,6 @@ export interface InstructionParameter {
 }
 
 interface ParameterDescriptor {
-  name: string;
   isOutput?: boolean;
   isLabel?: boolean;
   restrict?: {
@@ -54,10 +53,7 @@ interface ParameterDescriptor {
   };
 }
 
-export type SingleDescriptor = Record<
-  string,
-  Omit<ParameterDescriptor, "name">
->;
+export type SingleDescriptor = Record<string, ParameterDescriptor>;
 export type OverloadDescriptor = Record<string, SingleDescriptor>;
 
 export type DescriptorData<T extends SingleDescriptor> = Partial<
@@ -286,16 +282,17 @@ export function createOverloadDescriptor<
       context: CompletionContext,
       targetToken: TextToken | undefined
     ) {
-      if (targetToken === data.typeToken) {
-        return overloadCompletionItems(overloads);
+      // makes sure that the keys are in the correct order
+      const keys = [...preKeys, "typeToken"];
+      if (data.type !== "unknown") {
+        keys.push(...Object.keys(overloads[data.type]));
       }
 
-      for (const key in data) {
+      for (const key of keys) {
         const value = data[key];
-        // skip 'type' key
-        if (typeof value === "string") continue;
-
         if (value !== targetToken) continue;
+
+        if (key === "typeToken") return overloadCompletionItems(overloads);
 
         const param = pre?.[key] ?? overloads[data.type][key];
 
