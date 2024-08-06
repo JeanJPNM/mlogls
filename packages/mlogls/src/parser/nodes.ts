@@ -2000,6 +2000,43 @@ export class SetPropInstruction extends InstructionNode<
   }
 }
 
+export class PlaySoundInstruction extends InstructionNode<
+  DataOf<typeof PlaySoundInstruction>
+> {
+  descriptor = PlaySoundInstruction.descriptor;
+
+  static readonly descriptor = createOverloadDescriptor({
+    name: "playsound",
+    overloads: {
+      // global
+      false: {
+        id: {},
+        volume: {},
+        pitch: {},
+        pan: {},
+        _x: {},
+        _y: {},
+        limit: {},
+      },
+      // positional
+      true: {
+        id: {},
+        volume: {},
+        pitch: {},
+        _pan: {},
+        x: {},
+        y: {},
+        limit: {},
+      },
+    },
+  });
+
+  static parse(this: void, line: TokenLine) {
+    const data = PlaySoundInstruction.descriptor.parse(line.tokens);
+
+    return new PlaySoundInstruction(line, ...data);
+  }
+}
 export class SetMarkerInstruction extends InstructionNode<
   DataOf<typeof SetMarkerInstruction>
 > {
@@ -2126,6 +2163,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   getflag: GetFlagInstruction.parse,
   setflag: SetFlagInstruction.parse,
   setprop: SetPropInstruction.parse,
+  playsound: PlaySoundInstruction.parse,
   setmarker: SetMarkerInstruction.parse,
   makemarker: MakeMakerInstruction.parse,
   printlocale: PrintLocaleInstruction.parse,
