@@ -470,7 +470,7 @@ export function validateParameters(
   for (const param of parameters) {
     switch (param.usage) {
       case ParameterUsage.ignored:
-        if (param.type !== ParameterType.variable) break;
+        if (param.type === ParameterType.enumMember) break;
         if (param.token.content === "_") break;
 
         diagnostics.push({
@@ -483,7 +483,6 @@ export function validateParameters(
         });
         break;
       case ParameterUsage.unused:
-        if (param.type !== ParameterType.variable) break;
         diagnostics.push({
           range: param.token,
           message: "Unused parameter",
