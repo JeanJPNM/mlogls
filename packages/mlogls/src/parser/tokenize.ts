@@ -141,7 +141,10 @@ export function tokenize(chars: string) {
     const end = getCurrentLocation();
     const endPos = pos;
     const content = chars.slice(startPos, endPos);
-    if (content.startsWith("%"))
+    if (
+      content.startsWith("%") &&
+      (content.length === 7 || content.length === 9)
+    )
       return new ColorLiteralToken(start, end, content);
     if (!isNaN(Number(content))) return new NumberToken(start, end, content);
     return new IdentifierToken(start, end, content);
