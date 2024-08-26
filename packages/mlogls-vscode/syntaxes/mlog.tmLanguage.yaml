@@ -42,16 +42,14 @@ repository:
           - include: "#label"
           - include: "#statement"
   statement:
-    match: \s*(\w+)(.*)$
+    match: \s*([^\s#;]+)(.*)$
     captures:
       1:
         patterns:
-          - match: \b(?:(wait|jump|end|stop)|(\w+))\b
-            captures:
-              1:
-                name: keyword.control.mlog
-              2:
-                name: keyword.mlog
+          - match: (wait|end|jump|stop)$
+            name: keyword.control.mlog
+          - match: .*
+            name: keyword.mlog
       2:
         patterns:
           - include: "#comment"
@@ -70,7 +68,7 @@ repository:
       - include: "#string"
 
   label:
-    match: \s*(\S+)(:)(.*)
+    match: \s*([^\s#;]+)(:)(.*)
     captures:
       1:
         name: entity.name.function.mlog
