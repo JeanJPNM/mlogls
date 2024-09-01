@@ -1407,17 +1407,12 @@ export class SpawnWaveInstruction extends InstructionNode<
 > {
   descriptor = SpawnWaveInstruction.descriptor;
 
-  static readonly descriptor = createOverloadDescriptor({
+  static readonly descriptor = createSingleDescriptor({
     name: "spawnwave",
-    pre: {
+    descriptor: {
       x: {},
       y: {},
-    },
-    overloads: {
-      // natural wave
-      true: {},
-      // synthetic wave
-      false: {},
+      natural: {},
     },
   });
 
@@ -1426,34 +1421,12 @@ export class SpawnWaveInstruction extends InstructionNode<
 
     // x and y are not used in natural waves
     // the units will appear at the map's spawn point
-    if (data.type === "true") {
+    if (data.natural?.content === "true") {
       params[0].usage = ParameterUsage.ignored;
       params[1].usage = ParameterUsage.ignored;
     }
 
     return new SpawnWaveInstruction(line, data, params);
-  }
-
-  provideSignatureHelp(character: number): SignatureHelp {
-    const help = super.provideSignatureHelp(character);
-
-    // override the signature help of the natural wave
-    // overload to show the x and y parameters
-    // as unused
-    for (const signature of help.signatures) {
-      if (!signature.label.includes("true")) continue;
-
-      signature.label = signature.label
-        .replace("<x>", "<_x>")
-        .replace("<y>", "<_y>");
-
-      for (const param of signature.parameters!) {
-        if (param.label === "<x>") param.label = "<_x>";
-        if (param.label === "<y>") param.label = "<_y>";
-      }
-    }
-
-    return help;
   }
 }
 
