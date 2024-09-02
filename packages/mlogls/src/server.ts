@@ -21,7 +21,14 @@ import {
   DiagnosticSeverity,
 } from "vscode-languageserver";
 import { MlogDocument } from "./document";
-import { DiagnosticCode, TokenModifiers, TokenTypes } from "./protocol";
+import {
+  CommandCode,
+  CommandHandlerMap,
+  createCommandAction,
+  DiagnosticCode,
+  TokenModifiers,
+  TokenTypes,
+} from "./protocol";
 import {
   buildingLinkNames,
   builtinGlobals,
@@ -65,13 +72,6 @@ export interface LanguageServerOptions {
   connection: Connection;
 }
 
-enum Commands {
-  useJumpLabels = "mlogls.useJumpLabels",
-  useJumpIndexes = "mlogls.useJumpIndexes",
-  convertToColorLiteral = "mlogls.convertToColorLiteral",
-  convertToPackColor = "mlogls.convertToPackColor",
-}
-
 export function startServer(options: LanguageServerOptions) {
   const { connection } = options;
 
@@ -85,8 +85,8 @@ export function startServer(options: LanguageServerOptions) {
     },
   });
 
-  const commands = {
-    async convertToLabels(textDocument: TextDocumentIdentifier) {
+  const commands: CommandHandlerMap = {
+    async [CommandCode.useJumpLabels](textDocument) {
       const doc = documents.get(textDocument.uri);
       if (!doc) return;
 
@@ -96,7 +96,7 @@ export function startServer(options: LanguageServerOptions) {
         },
       });
     },
-    async convertToIndexes(textDocument: TextDocumentIdentifier) {
+    async [CommandCode.useJumpIndexes](textDocument) {
       const doc = documents.get(textDocument.uri);
       if (!doc) return;
 
@@ -106,10 +106,7 @@ export function startServer(options: LanguageServerOptions) {
         },
       });
     },
-    async convertToColorLiteral(
-      textDocument: TextDocumentIdentifier,
-      start: Position
-    ) {
+    async [CommandCode.convertToColorLiteral](textDocument, start) {
       const doc = documents.get(textDocument.uri);
       if (!doc) return;
       const node = getSelectedSyntaxNode(doc, start);
@@ -145,10 +142,7 @@ export function startServer(options: LanguageServerOptions) {
         },
       });
     },
-    async convertToPackColor(
-      textDocument: TextDocumentIdentifier,
-      start: Position
-    ) {
+    async [CommandCode.convertToPackColor](textDocument, start) {
       const doc = documents.get(textDocument.uri);
       if (!doc) return;
       const node = getSelectedSyntaxNode(doc, start);
@@ -172,6 +166,32 @@ export function startServer(options: LanguageServerOptions) {
             // using last.end instead of node.end to preserve comments
             TextEdit.replace(Range.create(node.start, value.end), newText),
           ],
+        },
+      });
+    },
+    async [CommandCode.removeAllUnusedParameters](textDocument) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+
+      const { nodes } = doc;
+      const edits: TextEdit[] = [];
+
+      for (const node of nodes) {
+        if (!(node instanceof InstructionNode)) continue;
+
+        const firstIgnored = node.parameters.find(
+          (param) => param.usage === ParameterUsage.unused
+        );
+        if (!firstIgnored) continue;
+
+        const start = firstIgnored.token.start;
+        const end = node.parameters[node.parameters.length - 1].token.end;
+        edits.push(TextEdit.del(Range.create(start, end)));
+      }
+
+      await connection.workspace.applyEdit({
+        changes: {
+          [doc.uri]: edits,
         },
       });
     },
@@ -202,7 +222,7 @@ export function startServer(options: LanguageServerOptions) {
         documentFormattingProvider: true,
         codeActionProvider: true,
         executeCommandProvider: {
-          commands: Object.values(Commands),
+          commands: Object.values(CommandCode),
         },
         definitionProvider: true,
         referencesProvider: true,
@@ -549,80 +569,95 @@ export function startServer(options: LanguageServerOptions) {
         if (blue && !blue.isNumber()) continue;
         if (alpha && !alpha.isNumber()) continue;
 
-        actions.push({
-          title: "Convert to color literal",
-          kind: CodeActionKind.Refactor,
-          arguments: [params.textDocument, node.start],
-          command: Commands.convertToColorLiteral,
-        });
+        actions.push(
+          createCommandAction({
+            title: "Convert to color literal",
+            command: CommandCode.convertToColorLiteral,
+            arguments: [params.textDocument, node.start],
+            kind: CodeActionKind.Refactor,
+          })
+        );
       } else if (node instanceof SetInstruction) {
         const { value } = node.data;
         if (!value?.isColorLiteral()) continue;
 
-        actions.push({
-          title: "Convert to packcolor instruction",
-          kind: CodeActionKind.Refactor,
-          arguments: [params.textDocument, node.start],
-          command: Commands.convertToPackColor,
-        });
+        actions.push(
+          createCommandAction({
+            title: "Convert to packcolor instruction",
+            kind: CodeActionKind.Refactor,
+            arguments: [params.textDocument, node.start],
+            command: CommandCode.convertToPackColor,
+          })
+        );
       }
     }
 
     if (hasLabelJump) {
-      actions.push({
-        title: "Use indexes for all jumps",
-        kind: CodeActionKind.RefactorRewrite,
-        command: Commands.useJumpIndexes,
-        arguments: [textDocument],
-      });
+      actions.push(
+        createCommandAction({
+          title: "Use indexes for all jumps",
+          kind: CodeActionKind.RefactorRewrite,
+          command: CommandCode.useJumpIndexes,
+          arguments: [textDocument],
+        })
+      );
     }
 
     if (hasIndexJump) {
-      actions.push({
-        title: "Use labels for all jumps",
-        kind: CodeActionKind.RefactorRewrite,
-        command: Commands.useJumpLabels,
-        arguments: [textDocument],
-      });
+      actions.push(
+        createCommandAction({
+          title: "Use labels for all jumps",
+          kind: CodeActionKind.RefactorRewrite,
+          command: CommandCode.useJumpLabels,
+          arguments: [textDocument],
+        })
+      );
     }
 
     return actions;
   });
 
   connection.onExecuteCommand(async (params) => {
-    const command = params.command as Commands;
+    const command = params.command as CommandCode;
     const args: unknown[] = params.arguments ?? [];
 
     switch (command) {
-      case Commands.useJumpLabels: {
+      case CommandCode.useJumpLabels: {
         const [textDocument] = args;
         if (!TextDocumentIdentifier.is(textDocument)) return;
 
-        await commands.convertToLabels(textDocument);
+        await commands[command](textDocument);
         break;
       }
 
-      case Commands.useJumpIndexes: {
+      case CommandCode.useJumpIndexes: {
         const [textDocument] = args;
         if (!TextDocumentIdentifier.is(textDocument)) return;
 
-        await commands.convertToIndexes(textDocument);
+        await commands[command](textDocument);
         break;
       }
 
-      case Commands.convertToColorLiteral: {
+      case CommandCode.convertToColorLiteral: {
         const [textDocument, start] = args;
         if (!TextDocumentIdentifier.is(textDocument) || !Position.is(start))
           return;
-        await commands.convertToColorLiteral(textDocument, start);
+        await commands[command](textDocument, start);
         break;
       }
 
-      case Commands.convertToPackColor: {
+      case CommandCode.convertToPackColor: {
         const [textDocument, start] = args;
         if (!TextDocumentIdentifier.is(textDocument) || !Position.is(start))
           return;
-        await commands.convertToPackColor(textDocument, start);
+        await commands[command](textDocument, start);
+        break;
+      }
+      case CommandCode.removeAllUnusedParameters: {
+        const [textDocument] = args;
+        if (!TextDocumentIdentifier.is(textDocument)) return;
+        await commands[command](textDocument);
+        break;
       }
     }
   });

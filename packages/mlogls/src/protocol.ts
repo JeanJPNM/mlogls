@@ -1,3 +1,9 @@
+import {
+  CodeAction,
+  Position,
+  TextDocumentIdentifier,
+} from "vscode-languageserver";
+
 const tokenTypes = [
   "keyword",
   "variable",
@@ -62,6 +68,57 @@ export enum DiagnosticCode {
   missingSpace = "missing-space",
   unclosedString = "unclosed-string",
   unknownColorName = "unknown-color-name",
+}
+
+export enum CommandCode {
+  useJumpLabels = "mlogls.useJumpLabels",
+  useJumpIndexes = "mlogls.useJumpIndexes",
+  convertToColorLiteral = "mlogls.convertToColorLiteral",
+  convertToPackColor = "mlogls.convertToPackColor",
+  removeAllUnusedParameters = "mlogls.removeAllUnusedParameters",
+}
+
+export interface CommandHandlerMap {
+  [CommandCode.useJumpLabels](
+    textDocument: TextDocumentIdentifier
+  ): Promise<void>;
+  [CommandCode.useJumpIndexes](
+    textDocument: TextDocumentIdentifier
+  ): Promise<void>;
+  [CommandCode.convertToColorLiteral](
+    textDocument: TextDocumentIdentifier,
+    position: Position
+  ): Promise<void>;
+
+  [CommandCode.convertToPackColor](
+    textDocument: TextDocumentIdentifier,
+    position: Position
+  ): Promise<void>;
+  [CommandCode.removeAllUnusedParameters](
+    textDocument: TextDocumentIdentifier
+  ): Promise<void>;
+}
+
+type CreateCommandActionOptions<C extends CommandCode> = Omit<
+  CodeAction,
+  "command"
+> & {
+  command: C;
+  arguments: Parameters<CommandHandlerMap[C]>;
+};
+
+export function createCommandAction<C extends CommandCode>(
+  options: CreateCommandActionOptions<C>
+): CodeAction {
+  const { command, arguments: args, ...action } = options;
+  return {
+    ...action,
+    command: {
+      title: action.title,
+      command,
+      arguments: args,
+    },
+  };
 }
 
 type TokenLegend<K extends string> = Record<K, number> & { keys: K[] };

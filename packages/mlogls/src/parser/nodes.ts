@@ -11,7 +11,12 @@ import {
   TextEdit,
 } from "vscode-languageserver";
 import { ParserDiagnostic, TokenLine } from "./tokenize";
-import { DiagnosticCode, TokenTypes } from "../protocol";
+import {
+  CommandCode,
+  createCommandAction,
+  DiagnosticCode,
+  TokenTypes,
+} from "../protocol";
 import {
   createOverloadDescriptor,
   createSingleDescriptor,
@@ -210,8 +215,10 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
               [doc.uri]: [TextEdit.replace(diagnostic.range, "_")],
             },
           },
+          diagnostics: [diagnostic],
           kind: CodeActionKind.QuickFix,
         });
+
         break;
 
       case DiagnosticCode.unusedParameter:
@@ -223,8 +230,18 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
               [doc.uri]: [TextEdit.del(diagnostic.range)],
             },
           },
+          diagnostics: [diagnostic],
           kind: CodeActionKind.QuickFix,
         });
+
+        actions.push(
+          createCommandAction({
+            command: CommandCode.removeAllUnusedParameters,
+            arguments: [{ uri: doc.uri }],
+            title: "Remove all unused parameters",
+            kind: CodeActionKind.QuickFix,
+          })
+        );
     }
   }
 
@@ -692,6 +709,11 @@ export class OpInstruction extends InstructionNode<
   DataOf<typeof OpInstruction>
 > {
   descriptor = OpInstruction.descriptor;
+
+  static readonly legacyAliases: Record<string, string> = {
+    atan2: "angle",
+    dst: "len",
+  };
 
   static readonly descriptor = createOverloadDescriptor({
     name: "op",
