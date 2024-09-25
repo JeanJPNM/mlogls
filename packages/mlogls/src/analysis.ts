@@ -247,6 +247,13 @@ export function validateLabelUsage(
     if (!destination) continue;
 
     if (destination.isNumber()) {
+      diagnostics.push({
+        range: destination,
+        message: "Prefer using labels instead of jump addresses",
+        severity: DiagnosticSeverity.Hint,
+        code: DiagnosticCode.preferJumpLabels,
+      });
+
       const address = Number(destination.content);
       if (address < 0 || address >= instructionCount) {
         diagnostics.push({
