@@ -919,6 +919,7 @@ export class PackColorInstruction extends InstructionNode<
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
+    super.provideCodeActions(doc, diagnostic, actions);
     if (diagnostic.code !== DiagnosticCode.excessPackcolorPrecision) return;
 
     const number = getTargetToken(
