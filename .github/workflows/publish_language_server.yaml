@@ -1,0 +1,27 @@
+name: Tagged Production Deploys for the Language Server
+
+on:
+  push:
+    tags:
+      - "mlogls-*"
+      - "!mlogls-vscode-*"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18.x"
+          registry-url: "https://registry.npmjs.org"
+          cache: pnpm
+
+      - run: pnpm install
+      - run: cd packages/mlogls
+      - run: pnpm build
+      - run: pnpm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
