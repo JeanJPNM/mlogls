@@ -45,7 +45,7 @@ export interface LabelBlock {
   children: LabelBlock[];
 }
 
-export const buildingNamePattern = /([a-z]+)(\d+)/;
+export const buildingNamePattern = /^([a-z]+)(\d+)$/;
 
 /**
  * Returns a set of label names that are accessible in the logical scope of the
