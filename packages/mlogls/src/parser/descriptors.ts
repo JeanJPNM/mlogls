@@ -644,7 +644,8 @@ function provideSemantics(
         break;
 
       case ParameterType.variable:
-        if (param.usage !== ParameterUsage.write) break;
+        if (param.usage !== ParameterUsage.write || !param.token.isIdentifier())
+          break;
 
         tokens.push({
           token: param.token,
