@@ -773,7 +773,7 @@ export class OpInstruction extends InstructionNode<
     // use of the set instruction affects the control flow
     // just like jump
     if (
-      this.data.type !== "unknown" &&
+      this.data.$type !== "unknown" &&
       this.data.result?.content === counterVar
     ) {
       tokens.push({

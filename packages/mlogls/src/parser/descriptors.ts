@@ -67,11 +67,11 @@ export type OverloadData<
   | {
       [K in keyof T]: DescriptorData<Pre> &
         DescriptorData<T[K]> & {
-          type: K;
+          $type: K;
           typeToken: TextToken;
         };
     }[keyof T]
-  | (DescriptorData<Pre> & { type: "unknown"; typeToken?: TextToken });
+  | (DescriptorData<Pre> & { $type: "unknown"; typeToken?: TextToken });
 
 export interface InstructionDescriptor<Data> {
   parse(tokens: TextToken[]): [Data, InstructionParameter[]];
@@ -194,7 +194,7 @@ export function createOverloadDescriptor<
             {
               ...preData,
               ...parseDescriptor(params, tokens, typeTokenIndex + 1),
-              type: key,
+              $type: key,
               typeToken,
             },
             [
@@ -218,7 +218,7 @@ export function createOverloadDescriptor<
         });
       }
       return [
-        { ...preData, type: "unknown", typeToken },
+        { ...preData, $type: "unknown", typeToken },
         [...preParams, ...parseParameters({}, tokens, typeTokenIndex + 1)],
       ];
     },
@@ -244,11 +244,11 @@ export function createOverloadDescriptor<
       });
     },
     getActiveSignature(data: OverloadData<T, Pre>): number {
-      if (data.type === "unknown") return 0;
+      if (data.$type === "unknown") return 0;
 
       let i = 0;
       for (const current in overloads) {
-        if (current === data.type) return i;
+        if (current === data.$type) return i;
         i++;
       }
 
@@ -260,12 +260,12 @@ export function createOverloadDescriptor<
       tokens: TextToken[]
     ): number {
       const targetToken = getTargetToken(character, tokens);
-      if (data.type === "unknown" && preKeys.length === 0) return -1;
+      if (data.$type === "unknown" && preKeys.length === 0) return -1;
 
       const keys = [...preKeys];
 
-      if (data.type !== "unknown") {
-        const parameters = overloads[data.type];
+      if (data.$type !== "unknown") {
+        const parameters = overloads[data.$type];
         keys.push(...Object.keys(parameters));
       }
 
@@ -284,8 +284,8 @@ export function createOverloadDescriptor<
     ) {
       // makes sure that the keys are in the correct order
       const keys = [...preKeys, "typeToken"];
-      if (data.type !== "unknown") {
-        keys.push(...Object.keys(overloads[data.type]));
+      if (data.$type !== "unknown") {
+        keys.push(...Object.keys(overloads[data.$type]));
       }
 
       for (const key of keys) {
@@ -294,7 +294,7 @@ export function createOverloadDescriptor<
 
         if (key === "typeToken") return overloadCompletionItems(overloads);
 
-        const param = pre?.[key] ?? overloads[data.type][key];
+        const param = pre?.[key] ?? overloads[data.$type][key];
 
         if (param.isLabel) return context.getLabelCompletions();
 
@@ -311,7 +311,7 @@ export function createOverloadDescriptor<
       return context.getVariableCompletions();
     },
     provideDiagnostics(data, parameters, diagnostics) {
-      if (data.type === "unknown" && data.typeToken) {
+      if (data.$type === "unknown" && data.typeToken) {
         diagnostics.push({
           range: data.typeToken,
           message: `Unknown ${name} type: ${data.typeToken.content}`,
@@ -321,8 +321,8 @@ export function createOverloadDescriptor<
         return;
       }
 
-      if (data.type !== "unknown") {
-        const descriptor = overloads[data.type];
+      if (data.$type !== "unknown") {
+        const descriptor = overloads[data.$type];
         validateMembers(
           descriptor,
           data as DescriptorData<typeof descriptor>,
