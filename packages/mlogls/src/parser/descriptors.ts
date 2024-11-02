@@ -393,15 +393,8 @@ function parseParameters<const T extends SingleDescriptor>(
         type = ParameterType.enumMember;
       } else if (param.isLabel) {
         type = ParameterType.label;
-      } else if (keywords.includes(token.content)) {
-        type = ParameterType.keyword;
-      } else if (
-        token.content != counterVar &&
-        builtinGlobalsSet.has(token.content)
-      ) {
-        type = ParameterType.readonlyGlobal;
-      } else if (isBuildingLink(token.content)) {
-        type = ParameterType.buildingLink;
+      } else {
+        type = getParameterType(token);
       }
 
       parameters.push({
@@ -418,13 +411,24 @@ function parseParameters<const T extends SingleDescriptor>(
     if (token.isComment()) break;
 
     parameters.push({
-      type: ParameterType.variable,
+      type: getParameterType(token),
       token,
       usage: ParameterUsage.unused,
     });
   }
 
   return parameters;
+}
+
+function getParameterType(token: TextToken) {
+  if (keywords.includes(token.content)) return ParameterType.keyword;
+
+  if (token.content !== counterVar && builtinGlobalsSet.has(token.content))
+    return ParameterType.readonlyGlobal;
+
+  if (isBuildingLink(token.content)) return ParameterType.buildingLink;
+
+  return ParameterType.variable;
 }
 
 function getDescriptorSignature<const T extends SingleDescriptor>(
