@@ -27,4 +27,37 @@ Currently Supported:
 
 Install a plugin for your editor:
 
-- [VS Code](../mlogls-vscode)
+### VS Code
+
+mlogls has a VS Code extension ([mlogls-vscode](../mlogls-vscode))
+
+### Neovim
+
+First install mlogls globally with a package manager:
+
+```sh
+npm i -g mlogls
+```
+
+Then, you can have a simple setup using [lspconfig](https://github.com/neovim/nvim-lspconfig).
+
+```lua
+local lspconfig = require("lspconfig")
+local configs = require("lspconfig.configs")
+
+vim.filetype.add {
+  extension = {
+    mlog = "mlog"
+  }
+}
+
+configs.mlogls = {
+  default_config = {
+    cmd = { "mlogls", "--stdio" },
+    filetypes = { "mlog" },
+    single_file_support = true
+  }
+}
+
+configs.mlogls.setup {}
+```
