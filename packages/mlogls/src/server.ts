@@ -441,6 +441,7 @@ export function startServer(options: LanguageServerOptions) {
 
         return completions;
       }
+      return;
     }
 
     const context: CompletionContext = {
