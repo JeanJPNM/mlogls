@@ -63,7 +63,7 @@ import {
   TokenSemanticData,
   usedBuildingLinks,
   validateLabelUsage,
-  validateUnusedVariables,
+  validateVariableUsage,
 } from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
 import { findRange, findRangeIndex } from "./util/range_search";
@@ -1022,7 +1022,7 @@ export function startServer(options: LanguageServerOptions) {
     }
 
     validateLabelUsage(doc, parserDiagnostics);
-    validateUnusedVariables(doc.nodes, parserDiagnostics);
+    validateVariableUsage(doc.nodes, parserDiagnostics);
 
     const diagnostics: Diagnostic[] = [];
 

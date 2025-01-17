@@ -441,7 +441,7 @@ export function isBuildingLink(name: string) {
   return buildingLinkNames.has(linkName);
 }
 
-export function validateUnusedVariables(
+export function validateVariableUsage(
   nodes: SyntaxNode[],
   diagnostics: ParserDiagnostic[]
 ) {
@@ -457,7 +457,18 @@ export function validateUnusedVariables(
         param.usage !== ParameterUsage.read
       )
         continue;
-      unusedVariables.delete(param.token.content);
+
+      const name = param.token.content;
+      unusedVariables.delete(name);
+
+      if (!param.token.isIdentifier() || variables.has(name)) continue;
+
+      diagnostics.push({
+        range: param.token,
+        message: `Variable '${name}' is never declared`,
+        severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.undefinedVariable,
+      });
     }
   }
 

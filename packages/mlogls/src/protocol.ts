@@ -54,6 +54,7 @@ export enum DiagnosticCode {
   unusedLabel = "unused-label",
   undefinedLabel = "undefined-label",
   unusedVariable = "unused-variable",
+  undefinedVariable = "undefined-variable",
   writingToReadOnly = "writing-to-readonly",
   outOfRangeValue = "out-of-range-value",
   excessPackcolorPrecision = "excess-packcolor-precision",
