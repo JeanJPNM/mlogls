@@ -29,14 +29,7 @@ import {
   TokenModifiers,
   TokenTypes,
 } from "./protocol";
-import {
-  buildingLinkNames,
-  builtinGlobals,
-  colorData,
-  colorsSet,
-  keywords,
-  maxInstructionCount,
-} from "./constants";
+import { colorData, colorsSet, maxInstructionCount } from "./constants";
 import { ParserDiagnostic, parseColor } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
@@ -51,7 +44,6 @@ import {
 import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
 import {
   CompletionContext,
-  declaredVariables,
   findLabelDefinition,
   findLabelReferences,
   findLabelsInScope,
@@ -61,7 +53,6 @@ import {
   LabelBlock,
   labelDeclarationNameRange,
   TokenSemanticData,
-  usedBuildingLinks,
   validateLabelUsage,
   validateVariableUsage,
 } from "./analysis";
@@ -248,7 +239,7 @@ export function startServer(options: LanguageServerOptions) {
     const tokens: TokenSemanticData[] = [];
 
     for (const node of doc.nodes) {
-      node.provideTokenSemantics(tokens);
+      node.provideTokenSemantics(doc, tokens);
     }
 
     let previous = Position.create(0, 0);
@@ -447,42 +438,19 @@ export function startServer(options: LanguageServerOptions) {
     const context: CompletionContext = {
       getVariableCompletions() {
         const completions: CompletionItem[] = [];
-        for (const keyword of keywords) {
+
+        for (const symbol of doc.symbolTable.values()) {
           completions.push({
-            label: keyword,
-            kind: CompletionItemKind.Keyword,
-            sortText: `0${keyword}`,
+            label: symbol.name,
+            kind: symbol.isKeyword
+              ? CompletionItemKind.Keyword
+              : CompletionItemKind.Variable,
+            // higher precedence to keywords and declared variables
+            sortText:
+              symbol.isGlobal || symbol.isBuildingLink
+                ? `1${symbol.name}`
+                : `0${symbol.name}`,
           });
-        }
-
-        for (const global of builtinGlobals) {
-          completions.push({
-            label: global,
-            kind: CompletionItemKind.Variable,
-            sortText: `1${global}`,
-          });
-        }
-
-        for (const variable of declaredVariables(doc.nodes)) {
-          completions.push({
-            label: variable,
-            kind: CompletionItemKind.Variable,
-            sortText: `0${variable}`,
-          });
-        }
-
-        const usedLinks = usedBuildingLinks(doc.nodes);
-
-        for (const name of buildingLinkNames) {
-          const limit = usedLinks.get(name) ?? 1;
-
-          for (let i = 1; i <= limit; i++) {
-            completions.push({
-              label: `${name}${i}`,
-              kind: CompletionItemKind.Variable,
-              sortText: `1${name}${i}`,
-            });
-          }
         }
 
         return completions;
@@ -740,8 +708,6 @@ export function startServer(options: LanguageServerOptions) {
 
     switch (selectedParameter.type) {
       case ParameterType.variable:
-      case ParameterType.buildingLink:
-      case ParameterType.readonlyGlobal:
         return findVariableUsageLocations(name, doc.nodes).map((location) => ({
           uri: params.textDocument.uri,
           range: location,
@@ -1007,7 +973,7 @@ export function startServer(options: LanguageServerOptions) {
 
     let instructionCount = 0;
     for (const node of doc.nodes) {
-      node.provideDiagnostics(parserDiagnostics);
+      node.provideDiagnostics(doc, parserDiagnostics);
       if (node instanceof InstructionNode) {
         instructionCount++;
 
@@ -1023,7 +989,7 @@ export function startServer(options: LanguageServerOptions) {
     }
 
     validateLabelUsage(doc, parserDiagnostics);
-    validateVariableUsage(doc.nodes, parserDiagnostics);
+    validateVariableUsage(doc, parserDiagnostics);
 
     const diagnostics: Diagnostic[] = [];
 

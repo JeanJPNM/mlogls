@@ -6,12 +6,15 @@ import {
   TextDocumentContentChangeEvent,
 } from "vscode-languageserver";
 import { SyntaxNode, getSyntaxNodes } from "./parser/nodes";
+import { getSymbolTable } from "./analysis";
+import { SymbolTable } from "./symbol";
 
 export class MlogDocument implements TextDocument {
   #document: TextDocument;
   #lines: TokenLine[] = [];
   #diagnostics: ParserDiagnostic[] = [];
   #nodes: SyntaxNode[] = [];
+  #symbolTable: SymbolTable | undefined;
 
   constructor(uri: string, languageId: string, version: number, text: string) {
     this.#document = TextDocument.create(uri, languageId, version, text);
@@ -53,6 +56,10 @@ export class MlogDocument implements TextDocument {
     return this.languageId === "mlog";
   }
 
+  get symbolTable() {
+    return (this.#symbolTable ??= getSymbolTable(this.nodes));
+  }
+
   getText(range?: Range | undefined): string {
     return this.#document.getText(range);
   }
@@ -65,6 +72,8 @@ export class MlogDocument implements TextDocument {
 
   update(changes: TextDocumentContentChangeEvent[], version: number) {
     TextDocument.update(this.#document, changes, version);
+    this.#symbolTable = undefined;
+
     if (this.isMlog) {
       ({ lines: this.#lines, diagnostics: this.#diagnostics } = tokenize(
         this.getText()
