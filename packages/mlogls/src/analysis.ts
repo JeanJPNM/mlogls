@@ -120,6 +120,18 @@ export function findLabelsInScope(
   return labels;
 }
 
+export function getLabelNames(nodes: SyntaxNode[]): Set<string> {
+  const labels = new Set<string>();
+
+  for (const node of nodes) {
+    if (!(node instanceof LabelDeclaration)) continue;
+
+    labels.add(node.name);
+  }
+
+  return labels;
+}
+
 export function findVariableUsageLocations(
   variable: string,
   nodes: SyntaxNode[]
@@ -284,10 +296,16 @@ export function validateLabelUsage(
     const label = destination.content;
     unusedLabels.delete(label);
 
+    let message = `Label '${label}' is not declared`;
+
+    const suggestion = getSpellingSuggestionForName(label, labels.keys());
+
+    if (suggestion) message += `. Did you mean '${suggestion}'?`;
+
     if (!labels.has(label)) {
       diagnostics.push({
         range: destination,
-        message: `Label '${label}' is not declared`,
+        message,
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.undefinedLabel,
       });

@@ -27,7 +27,11 @@ import {
   ParameterUsage,
 } from "./descriptors";
 import { counterVar } from "../constants";
-import { CompletionContext, TokenSemanticData } from "../analysis";
+import {
+  CompletionContext,
+  getLabelNames,
+  TokenSemanticData,
+} from "../analysis";
 import { MlogDocument } from "../document";
 import { ParserPosition, TextToken } from "./tokens";
 import { getSpellingSuggestionForName } from "../util/spelling";
@@ -1108,6 +1112,36 @@ export class JumpInstruction extends InstructionNode<
     }
 
     return super.provideCompletionItems(context, character);
+  }
+
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {
+    super.provideCodeActions(doc, diagnostic, actions);
+
+    const name = this.data.destination?.content;
+    if (!name || diagnostic.code !== DiagnosticCode.undefinedLabel) return;
+
+    const suggestion = getSpellingSuggestionForName(
+      name,
+      getLabelNames(doc.nodes)
+    );
+
+    if (!suggestion) return;
+
+    actions.push({
+      title: `Change spelling to '${suggestion}'.`,
+      edit: {
+        changes: {
+          [doc.uri]: [TextEdit.replace(diagnostic.range, suggestion)],
+        },
+      },
+      diagnostics: [diagnostic],
+      kind: CodeActionKind.QuickFix,
+      isPreferred: true,
+    });
   }
 }
 
