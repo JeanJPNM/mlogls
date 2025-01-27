@@ -1,4 +1,6 @@
 import {
+  CodeAction,
+  Command,
   CompletionItem,
   CompletionItemKind,
   DiagnosticSeverity,
@@ -10,10 +12,17 @@ import {
   SignatureInformation,
 } from "vscode-languageserver";
 import { ParserDiagnostic } from "./tokenize";
-import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
+import {
+  createSpellingAction,
+  DiagnosticCode,
+  TokenModifiers,
+  TokenTypes,
+} from "../protocol";
 import { CompletionContext, TokenSemanticData } from "../analysis";
 import { TextToken } from "./tokens";
 import { SymbolTable } from "../symbol";
+import { getSpellingSuggestionForName } from "../util/spelling";
+import { MlogDocument } from "../document";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -87,6 +96,13 @@ export interface InstructionDescriptor<Data> {
     parameters: InstructionParameter[],
     diagnostics: ParserDiagnostic[]
   ): void;
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: ParserDiagnostic,
+    data: Data,
+    tokens: TextToken[],
+    actions: (CodeAction | Command)[]
+  ): void;
   provideTokenSemantics(
     table: SymbolTable,
     params: InstructionParameter[],
@@ -136,6 +152,28 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
     provideDiagnostics(table, data, parameters, diagnostics) {
       validateMembers(descriptor, data, diagnostics);
       validateParameters(table, parameters, diagnostics);
+    },
+    provideCodeActions(doc, diagnostic, data, tokens, actions) {
+      if (diagnostic.code !== DiagnosticCode.unknownVariant) return;
+
+      const token = getTargetToken(diagnostic.range.start.character, tokens);
+      if (!token) return;
+
+      const name = getActiveParameterName(data, token);
+      if (!name) return;
+
+      const param = descriptor[name];
+
+      if (!param.restrict) return;
+
+      const suggestion = getSpellingSuggestionForName(
+        token.content,
+        param.restrict.values
+      );
+
+      if (!suggestion) return;
+
+      actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
     provideHover(data, character, tokens) {
@@ -307,9 +345,18 @@ export function createOverloadDescriptor<
     },
     provideDiagnostics(table, data, parameters, diagnostics) {
       if (data.$type === "unknown" && data.typeToken) {
+        let message = `Unknown ${name} type: ${data.typeToken.content}`;
+
+        const suggestion = getSpellingSuggestionForName(
+          data.typeToken.content,
+          Object.keys(overloads)
+        );
+
+        if (suggestion) message += `. Did you mean '${suggestion}'?`;
+
         diagnostics.push({
           range: data.typeToken,
-          message: `Unknown ${name} type: ${data.typeToken.content}`,
+          message,
           severity: DiagnosticSeverity.Error,
           code: DiagnosticCode.unknownVariant,
         });
@@ -326,6 +373,40 @@ export function createOverloadDescriptor<
       }
 
       validateParameters(table, parameters, diagnostics);
+    },
+    provideCodeActions(doc, diagnostic, data, tokens, actions) {
+      if (diagnostic.code !== DiagnosticCode.unknownVariant) return;
+
+      const token = getTargetToken(diagnostic.range.start.character, tokens);
+      if (!token) return;
+
+      if (token === data.typeToken) {
+        const suggestion = getSpellingSuggestionForName(
+          data.typeToken.content,
+          Object.keys(overloads)
+        );
+
+        if (!suggestion) return;
+
+        actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+        return;
+      }
+
+      const name = getActiveParameterName(data, token);
+      if (!name) return;
+
+      const param = pre?.[name] ?? overloads[data.$type]?.[name];
+
+      if (!param?.restrict) return;
+
+      const suggestion = getSpellingSuggestionForName(
+        token.content,
+        param.restrict.values
+      );
+
+      if (!suggestion) return;
+
+      actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
     provideHover(data, character, tokens) {
@@ -571,9 +652,21 @@ export function getTargetToken(character: number, tokens: TextToken[]) {
   // to perform plain equality comparisons with their respective tokens
   return (
     tokens.find(
-      (token) =>
-        token.start.character <= character && character <= token.end.character
+      ({ start, end }) =>
+        start.character <= character && character <= end.character
     ) ?? tokens.find((token) => token.start.character >= character)
+  );
+}
+
+export function getTargetParameter(
+  character: number,
+  parameters: InstructionParameter[]
+) {
+  return (
+    parameters.find(
+      ({ token: { start, end } }) =>
+        start.character <= character && character <= end.character
+    ) ?? parameters.find(({ token }) => token.start.character >= character)
   );
 }
 
@@ -597,9 +690,15 @@ export function validateRestrictedToken(
   if (!token) return;
   if (values.indexOf(token.content) !== -1) return;
 
+  const suggestion = getSpellingSuggestionForName(token.content, values);
+
+  let finalMessage = message + `'${token.content}'`;
+
+  if (suggestion) finalMessage += `. Did you mean '${suggestion}'?`;
+
   diagnostics.push({
     range: token,
-    message: message + token.content,
+    message: finalMessage,
     severity: DiagnosticSeverity.Warning,
     code: DiagnosticCode.unknownVariant,
   });

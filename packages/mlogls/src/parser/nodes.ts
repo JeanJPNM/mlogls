@@ -223,6 +223,14 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
+    this.descriptor.provideCodeActions(
+      doc,
+      diagnostic,
+      this.data,
+      this.line.tokens,
+      actions
+    );
+
     switch (diagnostic.code) {
       case DiagnosticCode.ignoredValue:
       case DiagnosticCode.unusedVariable:
