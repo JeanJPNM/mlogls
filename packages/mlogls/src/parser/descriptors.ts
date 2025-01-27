@@ -1,4 +1,6 @@
 import {
+  CodeAction,
+  Command,
   CompletionItem,
   CompletionItemKind,
   DiagnosticSeverity,
@@ -10,14 +12,17 @@ import {
   SignatureInformation,
 } from "vscode-languageserver";
 import { ParserDiagnostic } from "./tokenize";
-import { DiagnosticCode, TokenModifiers, TokenTypes } from "../protocol";
 import {
-  CompletionContext,
-  isBuildingLink,
-  TokenSemanticData,
-} from "../analysis";
-import { builtinGlobalsSet, counterVar, keywords } from "../constants";
+  createSpellingAction,
+  DiagnosticCode,
+  TokenModifiers,
+  TokenTypes,
+} from "../protocol";
+import { CompletionContext, TokenSemanticData } from "../analysis";
 import { TextToken } from "./tokens";
+import { SymbolTable } from "../symbol";
+import { getSpellingSuggestionForName } from "../util/spelling";
+import { MlogDocument } from "../document";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -32,9 +37,6 @@ export enum ParameterType {
   label,
   variable,
   enumMember,
-  keyword,
-  readonlyGlobal,
-  buildingLink,
 }
 
 export interface InstructionParameter {
@@ -89,11 +91,20 @@ export interface InstructionDescriptor<Data> {
   ): CompletionItem[];
 
   provideDiagnostics(
+    table: SymbolTable,
     data: Data,
     parameters: InstructionParameter[],
     diagnostics: ParserDiagnostic[]
   ): void;
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: ParserDiagnostic,
+    data: Data,
+    tokens: TextToken[],
+    actions: (CodeAction | Command)[]
+  ): void;
   provideTokenSemantics(
+    table: SymbolTable,
     params: InstructionParameter[],
     tokens: TokenSemanticData[]
   ): void;
@@ -138,9 +149,31 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       return [getDescriptorSignature(descriptor, name)];
     },
 
-    provideDiagnostics(data, parameters, diagnostics) {
+    provideDiagnostics(table, data, parameters, diagnostics) {
       validateMembers(descriptor, data, diagnostics);
-      validateParameters(parameters, diagnostics);
+      validateParameters(table, parameters, diagnostics);
+    },
+    provideCodeActions(doc, diagnostic, data, tokens, actions) {
+      if (diagnostic.code !== DiagnosticCode.unknownVariant) return;
+
+      const token = getTargetToken(diagnostic.range.start.character, tokens);
+      if (!token) return;
+
+      const name = getActiveParameterName(data, token);
+      if (!name) return;
+
+      const param = descriptor[name];
+
+      if (!param.restrict) return;
+
+      const suggestion = getSpellingSuggestionForName(
+        token.content,
+        param.restrict.values
+      );
+
+      if (!suggestion) return;
+
+      actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
     provideHover(data, character, tokens) {
@@ -310,11 +343,20 @@ export function createOverloadDescriptor<
 
       return context.getVariableCompletions();
     },
-    provideDiagnostics(data, parameters, diagnostics) {
+    provideDiagnostics(table, data, parameters, diagnostics) {
       if (data.$type === "unknown" && data.typeToken) {
+        let message = `Unknown ${name} type: ${data.typeToken.content}`;
+
+        const suggestion = getSpellingSuggestionForName(
+          data.typeToken.content,
+          Object.keys(overloads)
+        );
+
+        if (suggestion) message += `. Did you mean '${suggestion}'?`;
+
         diagnostics.push({
           range: data.typeToken,
-          message: `Unknown ${name} type: ${data.typeToken.content}`,
+          message,
           severity: DiagnosticSeverity.Error,
           code: DiagnosticCode.unknownVariant,
         });
@@ -330,7 +372,41 @@ export function createOverloadDescriptor<
         );
       }
 
-      validateParameters(parameters, diagnostics);
+      validateParameters(table, parameters, diagnostics);
+    },
+    provideCodeActions(doc, diagnostic, data, tokens, actions) {
+      if (diagnostic.code !== DiagnosticCode.unknownVariant) return;
+
+      const token = getTargetToken(diagnostic.range.start.character, tokens);
+      if (!token) return;
+
+      if (token === data.typeToken) {
+        const suggestion = getSpellingSuggestionForName(
+          data.typeToken.content,
+          Object.keys(overloads)
+        );
+
+        if (!suggestion) return;
+
+        actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+        return;
+      }
+
+      const name = getActiveParameterName(data, token);
+      if (!name) return;
+
+      const param = pre?.[name] ?? overloads[data.$type]?.[name];
+
+      if (!param?.restrict) return;
+
+      const suggestion = getSpellingSuggestionForName(
+        token.content,
+        param.restrict.values
+      );
+
+      if (!suggestion) return;
+
+      actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
     provideHover(data, character, tokens) {
@@ -393,8 +469,6 @@ function parseParameters<const T extends SingleDescriptor>(
         type = ParameterType.enumMember;
       } else if (param.isLabel) {
         type = ParameterType.label;
-      } else {
-        type = getParameterType(token);
       }
 
       parameters.push({
@@ -411,24 +485,13 @@ function parseParameters<const T extends SingleDescriptor>(
     if (token.isComment()) break;
 
     parameters.push({
-      type: getParameterType(token),
+      type: ParameterType.variable,
       token,
       usage: ParameterUsage.unused,
     });
   }
 
   return parameters;
-}
-
-function getParameterType(token: TextToken) {
-  if (keywords.includes(token.content)) return ParameterType.keyword;
-
-  if (token.content !== counterVar && builtinGlobalsSet.has(token.content))
-    return ParameterType.readonlyGlobal;
-
-  if (isBuildingLink(token.content)) return ParameterType.buildingLink;
-
-  return ParameterType.variable;
 }
 
 function getDescriptorSignature<const T extends SingleDescriptor>(
@@ -468,6 +531,7 @@ export function validateMembers<T extends SingleDescriptor>(
 }
 
 export function validateParameters(
+  table: SymbolTable,
   parameters: InstructionParameter[],
   diagnostics: ParserDiagnostic[]
 ) {
@@ -495,34 +559,38 @@ export function validateParameters(
           tags: [DiagnosticTag.Unnecessary],
         });
         break;
-      case ParameterUsage.write:
-        switch (param.type) {
-          case ParameterType.keyword:
-            diagnostics.push({
-              range: param.token,
-              message: "Cannot use a keyword as an output parameter",
-              code: DiagnosticCode.writingToReadOnly,
-              severity: DiagnosticSeverity.Error,
-            });
-            break;
-          case ParameterType.readonlyGlobal:
-          case ParameterType.buildingLink:
-            diagnostics.push({
-              range: param.token,
-              message: "Cannot write to a read-only variable",
-              code: DiagnosticCode.writingToReadOnly,
-              severity: DiagnosticSeverity.Error,
-            });
-            break;
-          case ParameterType.variable:
-            if (param.token.isIdentifier()) break;
-            diagnostics.push({
-              range: param.token,
-              message: "Cannot use a literal value as an output parameter",
-              code: DiagnosticCode.writingToReadOnly,
-              severity: DiagnosticSeverity.Error,
-            });
+      case ParameterUsage.write: {
+        if (param.type !== ParameterType.variable) break;
+
+        if (!param.token.isIdentifier()) {
+          diagnostics.push({
+            range: param.token,
+            message: "Cannot use a literal value as an output parameter",
+            code: DiagnosticCode.writingToReadOnly,
+            severity: DiagnosticSeverity.Error,
+          });
+          break;
         }
+
+        const symbol = table.get(param.token.content);
+        if (!symbol) break;
+
+        if (symbol.isKeyword) {
+          diagnostics.push({
+            range: param.token,
+            message: "Cannot use a keyword as an output parameter",
+            code: DiagnosticCode.writingToReadOnly,
+            severity: DiagnosticSeverity.Error,
+          });
+        } else if (!symbol.isWriteable) {
+          diagnostics.push({
+            range: param.token,
+            message: "Cannot write to a read-only variable",
+            code: DiagnosticCode.writingToReadOnly,
+            severity: DiagnosticSeverity.Error,
+          });
+        }
+      }
     }
   }
 }
@@ -584,9 +652,21 @@ export function getTargetToken(character: number, tokens: TextToken[]) {
   // to perform plain equality comparisons with their respective tokens
   return (
     tokens.find(
-      (token) =>
-        token.start.character <= character && character <= token.end.character
+      ({ start, end }) =>
+        start.character <= character && character <= end.character
     ) ?? tokens.find((token) => token.start.character >= character)
+  );
+}
+
+export function getTargetParameter(
+  character: number,
+  parameters: InstructionParameter[]
+) {
+  return (
+    parameters.find(
+      ({ token: { start, end } }) =>
+        start.character <= character && character <= end.character
+    ) ?? parameters.find(({ token }) => token.start.character >= character)
   );
 }
 
@@ -610,15 +690,22 @@ export function validateRestrictedToken(
   if (!token) return;
   if (values.indexOf(token.content) !== -1) return;
 
+  const suggestion = getSpellingSuggestionForName(token.content, values);
+
+  let finalMessage = message + `'${token.content}'`;
+
+  if (suggestion) finalMessage += `. Did you mean '${suggestion}'?`;
+
   diagnostics.push({
     range: token,
-    message: message + token.content,
+    message: finalMessage,
     severity: DiagnosticSeverity.Warning,
     code: DiagnosticCode.unknownVariant,
   });
 }
 
 function provideSemantics(
+  table: SymbolTable,
   parameters: InstructionParameter[],
   tokens: TokenSemanticData[]
 ) {
@@ -638,24 +725,25 @@ function provideSemantics(
           token: param.token,
         });
         break;
-      case ParameterType.readonlyGlobal:
-      case ParameterType.buildingLink:
+      case ParameterType.variable: {
+        if (!param.token.isIdentifier()) break;
+
+        const symbol = table.get(param.token.content);
+        if (!symbol) break;
+        let modifiers = 0;
+
+        if (!symbol.isWriteable) {
+          modifiers = TokenModifiers.readonly;
+        } else if (param.usage === ParameterUsage.write) {
+          modifiers = TokenModifiers.modification;
+        }
+
         tokens.push({
           token: param.token,
           type: TokenTypes.variable,
-          modifiers: TokenModifiers.readonly,
+          modifiers,
         });
-        break;
-
-      case ParameterType.variable:
-        if (param.usage !== ParameterUsage.write || !param.token.isIdentifier())
-          break;
-
-        tokens.push({
-          token: param.token,
-          type: TokenTypes.variable,
-          modifiers: TokenModifiers.modification,
-        });
+      }
     }
   }
 }

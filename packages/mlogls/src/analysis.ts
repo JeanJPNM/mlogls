@@ -15,8 +15,10 @@ import {
 import { ParserDiagnostic } from "./parser/tokenize";
 import { MlogDocument } from "./document";
 import { DiagnosticCode } from "./protocol";
-import { buildingLinkNames, counterVar, maxLabelCount } from "./constants";
+import { buildingLinkNames, maxLabelCount } from "./constants";
 import { ParserPosition, TextToken } from "./parser/tokens";
+import { NameSymbol, SymbolFlags, SymbolTable } from "./symbol";
+import { getSpellingSuggestionForName } from "./util/spelling";
 
 export interface TokenSemanticData {
   token: TextToken;
@@ -46,6 +48,43 @@ export interface LabelBlock {
 }
 
 export const buildingNamePattern = /^([a-z]+)(\d+)$/;
+
+export function getSymbolTable(nodes: SyntaxNode[]) {
+  const table = new SymbolTable();
+
+  for (const node of nodes) {
+    if (!(node instanceof InstructionNode)) continue;
+
+    for (const param of node.parameters) {
+      if (param.type !== ParameterType.variable) continue;
+
+      const name = param.token.content;
+      if (table.has(name)) continue;
+
+      if (isBuildingLink(name)) {
+        // register building links from [number] to 1
+        const match = buildingNamePattern.exec(name);
+        const baseName = match![1];
+        let number = Number(match![2]);
+
+        while (number > 0) {
+          const name = `${baseName}${number}`;
+          if (table.has(name)) break;
+
+          table.insert(new NameSymbol(name, SymbolFlags.buildingLink));
+          number--;
+        }
+        continue;
+      }
+
+      if (param.usage === ParameterUsage.write) {
+        table.insert(new NameSymbol(name, SymbolFlags.writeable));
+      }
+    }
+  }
+
+  return table;
+}
 
 /**
  * Returns a set of label names that are accessible in the logical scope of the
@@ -81,25 +120,16 @@ export function findLabelsInScope(
   return labels;
 }
 
-export function declaredVariables(nodes: SyntaxNode[]) {
-  const variables = new Set<string>();
+export function getLabelNames(nodes: SyntaxNode[]): Set<string> {
+  const labels = new Set<string>();
 
   for (const node of nodes) {
-    if (!(node instanceof InstructionNode)) continue;
+    if (!(node instanceof LabelDeclaration)) continue;
 
-    for (const param of node.parameters) {
-      if (
-        param.type !== ParameterType.variable ||
-        param.usage !== ParameterUsage.write ||
-        !param.token.isIdentifier() ||
-        param.token.content === counterVar
-      )
-        continue;
-      variables.add(param.token.content);
-    }
+    labels.add(node.name);
   }
 
-  return variables;
+  return labels;
 }
 
 export function findVariableUsageLocations(
@@ -111,12 +141,7 @@ export function findVariableUsageLocations(
     if (!(node instanceof InstructionNode)) continue;
 
     for (const param of node.parameters) {
-      if (
-        param.type !== ParameterType.variable &&
-        param.type !== ParameterType.readonlyGlobal &&
-        param.type !== ParameterType.buildingLink
-      )
-        continue;
+      if (param.type !== ParameterType.variable) continue;
       if (param.token.content !== variable) continue;
       locations.push(param.token);
     }
@@ -271,10 +296,16 @@ export function validateLabelUsage(
     const label = destination.content;
     unusedLabels.delete(label);
 
+    let message = `Label '${label}' is not declared`;
+
+    const suggestion = getSpellingSuggestionForName(label, labels.keys());
+
+    if (suggestion) message += `. Did you mean '${suggestion}'?`;
+
     if (!labels.has(label)) {
       diagnostics.push({
         range: destination,
-        message: `Label '${label}' is not declared`,
+        message,
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.undefinedLabel,
       });
@@ -410,29 +441,6 @@ export function getLabelBlocks(nodes: SyntaxNode[]) {
   return root;
 }
 
-export function usedBuildingLinks(nodes: SyntaxNode[]) {
-  const links = new Map<string, number>();
-
-  for (const node of nodes) {
-    if (!(node instanceof InstructionNode)) continue;
-
-    for (const param of node.parameters) {
-      if (param.type !== ParameterType.buildingLink) continue;
-      const match = buildingNamePattern.exec(param.token.content);
-      if (!match) continue;
-
-      const linkName = match[1];
-      const linkNumber = Number(match[2]);
-
-      if (!buildingLinkNames.has(linkName)) continue;
-
-      links.set(linkName, Math.max(links.get(linkName) || 0, linkNumber));
-    }
-  }
-
-  return links;
-}
-
 export function isBuildingLink(name: string) {
   const match = buildingNamePattern.exec(name);
   if (!match) return false;
@@ -442,11 +450,18 @@ export function isBuildingLink(name: string) {
 }
 
 export function validateVariableUsage(
-  nodes: SyntaxNode[],
+  doc: MlogDocument,
   diagnostics: ParserDiagnostic[]
 ) {
-  const variables = declaredVariables(nodes);
-  const unusedVariables = new Set<string>(variables);
+  const { symbolTable, nodes } = doc;
+
+  const unusedVariables = new Set<string>();
+
+  for (const symbol of symbolTable.localValues()) {
+    if (symbol.isBuildingLink) continue;
+
+    unusedVariables.add(symbol.name);
+  }
 
   for (const node of nodes) {
     if (!(node instanceof InstructionNode)) continue;
@@ -458,14 +473,22 @@ export function validateVariableUsage(
       )
         continue;
 
+      if (!param.token.isIdentifier()) continue;
+
       const name = param.token.content;
       unusedVariables.delete(name);
 
-      if (!param.token.isIdentifier() || variables.has(name)) continue;
+      if (symbolTable.has(name)) continue;
+
+      let message = `Variable '${name}' is never declared`;
+
+      const suggestion = getSpellingSuggestionForName(name, symbolTable.keys());
+
+      if (suggestion) message += `. Did you mean '${suggestion}'?`;
 
       diagnostics.push({
         range: param.token,
-        message: `Variable '${name}' is never declared`,
+        message,
         severity: DiagnosticSeverity.Warning,
         code: DiagnosticCode.undefinedVariable,
       });

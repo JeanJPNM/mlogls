@@ -14,6 +14,7 @@ import { ParserDiagnostic, TokenLine } from "./tokenize";
 import {
   CommandCode,
   createCommandAction,
+  createSpellingAction,
   DiagnosticCode,
   TokenTypes,
 } from "../protocol";
@@ -27,9 +28,14 @@ import {
   ParameterUsage,
 } from "./descriptors";
 import { counterVar } from "../constants";
-import { CompletionContext, TokenSemanticData } from "../analysis";
+import {
+  CompletionContext,
+  getLabelNames,
+  TokenSemanticData,
+} from "../analysis";
 import { MlogDocument } from "../document";
 import { ParserPosition, TextToken } from "./tokens";
+import { getSpellingSuggestionForName } from "../util/spelling";
 
 export abstract class SyntaxNode {
   start: ParserPosition;
@@ -40,7 +46,7 @@ export abstract class SyntaxNode {
     this.end = line.end;
   }
 
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
+  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
     // TODO: makes more sense to move this to the parser
     const tokens = this.line.tokens;
 
@@ -82,7 +88,10 @@ export abstract class SyntaxNode {
     return context.getVariableCompletions();
   }
 
-  provideTokenSemantics(_tokens: TokenSemanticData[]): void {}
+  provideTokenSemantics(
+    _doc: MlogDocument,
+    _tokens: TokenSemanticData[]
+  ): void {}
 
   provideCodeActions(
     _doc: MlogDocument,
@@ -125,8 +134,8 @@ export class LabelDeclaration extends SyntaxNode {
     this.name = line.tokens[0].content.slice(0, -1);
   }
 
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
+  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
+    super.provideDiagnostics(doc, diagnostics);
 
     const { tokens } = this.line;
 
@@ -191,13 +200,22 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     return this.descriptor.getCompletionItems(this.data, context, targetToken);
   }
 
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
-    this.descriptor.provideDiagnostics(this.data, this.parameters, diagnostics);
+  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
+    super.provideDiagnostics(doc, diagnostics);
+    this.descriptor.provideDiagnostics(
+      doc.symbolTable,
+      this.data,
+      this.parameters,
+      diagnostics
+    );
   }
 
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
-    this.descriptor.provideTokenSemantics(this.parameters, tokens);
+  provideTokenSemantics(doc: MlogDocument, tokens: TokenSemanticData[]): void {
+    this.descriptor.provideTokenSemantics(
+      doc.symbolTable,
+      this.parameters,
+      tokens
+    );
   }
 
   provideCodeActions(
@@ -205,6 +223,14 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
+    this.descriptor.provideCodeActions(
+      doc,
+      diagnostic,
+      this.data,
+      this.line.tokens,
+      actions
+    );
+
     switch (diagnostic.code) {
       case DiagnosticCode.ignoredValue:
       case DiagnosticCode.unusedVariable:
@@ -242,6 +268,22 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
             kind: CodeActionKind.QuickFix,
           })
         );
+        break;
+      case DiagnosticCode.undefinedVariable: {
+        const token = getTargetToken(
+          diagnostic.range.start.character,
+          this.line.tokens
+        );
+        if (!token?.isIdentifier()) break;
+
+        const suggestion = getSpellingSuggestionForName(
+          token.content,
+          doc.symbolTable.keys()
+        );
+        if (!suggestion) break;
+
+        actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+      }
     }
   }
 
@@ -313,16 +355,45 @@ export class UnknownInstruction extends InstructionNode<
     };
   }
 
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
+  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
+    super.provideDiagnostics(doc, diagnostics);
 
     const [name] = this.line.tokens;
+    let message = `Unknown instruction: ${name.content}`;
+    const suggestion = getSpellingSuggestionForName(
+      name.content,
+      getInstructionNames()
+    );
+
+    if (suggestion) {
+      message += `. Did you mean '${suggestion}'?`;
+    }
     diagnostics.push({
-      message: `Unknown instruction: ${name.content}`,
+      message,
       range: name,
       severity: DiagnosticSeverity.Warning,
       code: DiagnosticCode.unknownInstruction,
     });
+  }
+
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {
+    super.provideCodeActions(doc, diagnostic, actions);
+
+    if (diagnostic.code !== DiagnosticCode.unknownInstruction) return;
+
+    const [name] = this.line.tokens;
+    const suggestion = getSpellingSuggestionForName(
+      name.content,
+      getInstructionNames()
+    );
+
+    if (!suggestion) return;
+
+    actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
   }
 }
 
@@ -691,7 +762,7 @@ export class SetInstruction extends InstructionNode<
     return new SetInstruction(line, ...data);
   }
 
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
+  provideTokenSemantics(doc: MlogDocument, tokens: TokenSemanticData[]): void {
     // this tells the editor that this particular
     // use of the set instruction affects the control flow
     // just like jump
@@ -701,7 +772,7 @@ export class SetInstruction extends InstructionNode<
         type: TokenTypes.keyword,
       });
     }
-    super.provideTokenSemantics(tokens);
+    super.provideTokenSemantics(doc, tokens);
   }
 }
 
@@ -768,7 +839,7 @@ export class OpInstruction extends InstructionNode<
     );
   }
 
-  provideTokenSemantics(tokens: TokenSemanticData[]): void {
+  provideTokenSemantics(doc: MlogDocument, tokens: TokenSemanticData[]): void {
     // this tells the editor that this particular
     // use of the set instruction affects the control flow
     // just like jump
@@ -781,7 +852,7 @@ export class OpInstruction extends InstructionNode<
         type: TokenTypes.keyword,
       });
     }
-    super.provideTokenSemantics(tokens);
+    super.provideTokenSemantics(doc, tokens);
   }
 }
 
@@ -879,8 +950,8 @@ export class PackColorInstruction extends InstructionNode<
     return new PackColorInstruction(line, ...data);
   }
 
-  provideDiagnostics(diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(diagnostics);
+  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
+    super.provideDiagnostics(doc, diagnostics);
 
     const { red, green, blue, alpha } = this.data;
 
@@ -1030,6 +1101,26 @@ export class JumpInstruction extends InstructionNode<
     }
 
     return super.provideCompletionItems(context, character);
+  }
+
+  provideCodeActions(
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {
+    super.provideCodeActions(doc, diagnostic, actions);
+
+    const name = this.data.destination?.content;
+    if (!name || diagnostic.code !== DiagnosticCode.undefinedLabel) return;
+
+    const suggestion = getSpellingSuggestionForName(
+      name,
+      getLabelNames(doc.nodes)
+    );
+
+    if (!suggestion) return;
+
+    actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
   }
 }
 
