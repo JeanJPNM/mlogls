@@ -1,7 +1,10 @@
 import {
   CodeAction,
+  CodeActionKind,
+  Diagnostic,
   Position,
   TextDocumentIdentifier,
+  TextEdit,
 } from "vscode-languageserver";
 
 const tokenTypes = [
@@ -120,6 +123,24 @@ export function createCommandAction<C extends CommandCode>(
       command,
       arguments: args,
     },
+  };
+}
+
+export function createSpellingAction(
+  diagnostic: Diagnostic,
+  uri: string,
+  suggestion: string
+): CodeAction {
+  return {
+    title: `Change spelling to '${suggestion}'.`,
+    edit: {
+      changes: {
+        [uri]: [TextEdit.replace(diagnostic.range, suggestion)],
+      },
+    },
+    diagnostics: [diagnostic],
+    kind: CodeActionKind.QuickFix,
+    isPreferred: true,
   };
 }
 

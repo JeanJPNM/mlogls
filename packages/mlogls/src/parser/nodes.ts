@@ -14,6 +14,7 @@ import { ParserDiagnostic, TokenLine } from "./tokenize";
 import {
   CommandCode,
   createCommandAction,
+  createSpellingAction,
   DiagnosticCode,
   TokenTypes,
 } from "../protocol";
@@ -273,17 +274,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
         );
         if (!suggestion) break;
 
-        actions.push({
-          title: `Change spelling to '${suggestion}'`,
-          edit: {
-            changes: {
-              [doc.uri]: [TextEdit.replace(diagnostic.range, suggestion)],
-            },
-          },
-          diagnostics: [diagnostic],
-          kind: CodeActionKind.QuickFix,
-          isPreferred: true,
-        });
+        actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
       }
     }
   }
@@ -394,17 +385,7 @@ export class UnknownInstruction extends InstructionNode<
 
     if (!suggestion) return;
 
-    actions.push({
-      title: `Change spelling to '${suggestion}'`,
-      edit: {
-        changes: {
-          [doc.uri]: [TextEdit.replace(diagnostic.range, suggestion)],
-        },
-      },
-      diagnostics: [diagnostic],
-      kind: CodeActionKind.QuickFix,
-      isPreferred: true,
-    });
+    actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
   }
 }
 
@@ -1131,17 +1112,7 @@ export class JumpInstruction extends InstructionNode<
 
     if (!suggestion) return;
 
-    actions.push({
-      title: `Change spelling to '${suggestion}'.`,
-      edit: {
-        changes: {
-          [doc.uri]: [TextEdit.replace(diagnostic.range, suggestion)],
-        },
-      },
-      diagnostics: [diagnostic],
-      kind: CodeActionKind.QuickFix,
-      isPreferred: true,
-    });
+    actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
   }
 }
 
