@@ -561,6 +561,23 @@ export class PrintInstruction extends InstructionNode<
   }
 }
 
+export class PrintCharInstruction extends InstructionNode<
+  DataOf<typeof PrintCharInstruction>
+> {
+  descriptor = PrintCharInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "printchar",
+    descriptor: { value: {} },
+  });
+
+  static parse(this: void, line: TokenLine) {
+    const data = PrintCharInstruction.descriptor.parse(line.tokens);
+
+    return new PrintCharInstruction(line, ...data);
+  }
+}
+
 export class FormatInstruction extends InstructionNode<
   DataOf<typeof FormatInstruction>
 > {
@@ -2213,6 +2230,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   write: WriteInstruction.parse,
   draw: DrawInstruction.parse,
   print: PrintInstruction.parse,
+  printchar: PrintCharInstruction.parse,
   format: FormatInstruction.parse,
   drawflush: DrawFlushInstruction.parse,
   printflush: PrintFlushInstruction.parse,
