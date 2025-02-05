@@ -20,8 +20,7 @@ jobs:
           cache: pnpm
 
       - run: pnpm install
-      - run: cd packages/mlogls
-      - run: pnpm build
-      - run: pnpm publish
+      - run: pnpm -C packages/mlogls build
+      - run: pnpm -C packages/mlogls publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
