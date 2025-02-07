@@ -52,6 +52,10 @@ export const buildingNamePattern = /^([a-z]+)(\d+)$/;
 export function getSymbolTable(nodes: SyntaxNode[]) {
   const table = new SymbolTable();
 
+  for (const name of buildingLinkNames) {
+    table.insert(new NameSymbol(`${name}1`, SymbolFlags.buildingLink));
+  }
+
   for (const node of nodes) {
     if (!(node instanceof InstructionNode)) continue;
 
