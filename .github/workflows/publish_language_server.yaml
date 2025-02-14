@@ -21,6 +21,8 @@ jobs:
 
       - run: pnpm install
       - run: pnpm -C packages/mlogls build
-      - run: pnpm -C packages/mlogls publish --no-git-checks
+      - run: |
+          cd packages/mlogls
+          pnpm publish --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
