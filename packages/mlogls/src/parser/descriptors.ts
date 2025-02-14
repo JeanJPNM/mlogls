@@ -729,7 +729,11 @@ function provideSemantics(
         if (!param.token.isIdentifier()) break;
 
         const symbol = table.get(param.token.content);
-        if (!symbol) break;
+
+        // keywords are already taken care of by
+        // the language grammar
+        if (!symbol || symbol.isKeyword) break;
+
         let modifiers = 0;
 
         if (!symbol.isWriteable) {
