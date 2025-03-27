@@ -58,8 +58,11 @@ export class CommentToken extends TextToken {
 }
 
 export interface StringTokenTag {
+  /** The start position of the tag name relative to the token's content. */
   nameStart: number;
+  /** The end position of the tag name relative to the token's content. */
   nameEnd: number;
+  /** Color data extracted from the tag in case it's valid. */
   color?: Color;
 }
 

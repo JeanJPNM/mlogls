@@ -27,7 +27,7 @@ import {
   InstructionParameter,
   ParameterUsage,
 } from "./descriptors";
-import { counterVar } from "../constants";
+import { colorData, counterVar } from "../constants";
 import {
   CompletionContext,
   getLabelNames,
@@ -94,10 +94,33 @@ export abstract class SyntaxNode {
   ): void {}
 
   provideCodeActions(
-    _doc: MlogDocument,
-    _diagnostic: Diagnostic,
-    _actions: (CodeAction | Command)[]
-  ): void {}
+    doc: MlogDocument,
+    diagnostic: Diagnostic,
+    actions: (CodeAction | Command)[]
+  ): void {
+    if (diagnostic.code !== DiagnosticCode.unknownColorName) return;
+
+    const token = getTargetToken(
+      diagnostic.range.start.character,
+      this.line.tokens
+    );
+
+    if (!token?.isString()) return;
+
+    const offset = diagnostic.range.start.character - token.start.character;
+
+    for (const tag of token.colorTags) {
+      if (tag.nameStart > offset || tag.nameEnd < offset) continue;
+      const name = token.content.slice(tag.nameStart, tag.nameEnd);
+      const suggestion = getSpellingSuggestionForName(
+        name,
+        Object.keys(colorData)
+      );
+      if (!suggestion) return;
+
+      actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+    }
+  }
 
   provideHover(_character: number): Hover | undefined {
     return;
@@ -162,6 +185,7 @@ export class LabelDeclaration extends SyntaxNode {
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
+    super.provideCodeActions(doc, diagnostic, actions);
     if (diagnostic.code !== DiagnosticCode.unexpectedToken) return;
 
     actions.push({
@@ -223,6 +247,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
+    super.provideCodeActions(doc, diagnostic, actions);
     this.descriptor.provideCodeActions(
       doc,
       diagnostic,
