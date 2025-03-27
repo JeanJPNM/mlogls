@@ -61,6 +61,7 @@ export function getSymbolTable(nodes: SyntaxNode[]) {
 
     for (const param of node.parameters) {
       if (param.type !== ParameterType.variable) continue;
+      if (!param.token.isIdentifier()) continue;
 
       const name = param.token.content;
       if (table.has(name)) continue;
