@@ -234,15 +234,3 @@ export function tokenize(chars: string) {
 
   return { lines, diagnostics };
 }
-
-export function parseColor(color: string) {
-  if (color.length !== 6 && color.length !== 8)
-    return { red: 0, green: 0, blue: 0, alpha: 1 };
-
-  const red = parseInt(color.slice(0, 2), 16) / 255;
-  const green = parseInt(color.slice(2, 4), 16) / 255;
-  const blue = parseInt(color.slice(4, 6), 16) / 255;
-  const alpha = color.length === 8 ? parseInt(color.slice(6, 8), 16) / 255 : 1;
-
-  return { red, green, blue, alpha };
-}

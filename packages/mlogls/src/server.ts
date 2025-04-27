@@ -30,7 +30,7 @@ import {
   TokenTypes,
 } from "./protocol";
 import { colorData, colorsSet, maxInstructionCount } from "./constants";
-import { ParserDiagnostic, parseColor } from "./parser/tokenize";
+import { ParserDiagnostic } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
   CommentLine,
@@ -58,6 +58,7 @@ import {
 } from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
 import { findRange, findRangeIndex } from "./util/range_search";
+import { parseColor } from "./parser/tokens";
 
 export interface LanguageServerOptions {
   connection: Connection;
