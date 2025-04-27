@@ -513,9 +513,7 @@ export const colorData: Record<string, string> = {
   negstat: "e55454ff",
 };
 
-export const colors = Object.keys(colorData).map((color) => `@${color}`);
-
-export const colorsSet = new Set(colors);
+export const colors = Object.keys(colorData).map(makeColorVarName);
 
 export const items = [
   "@copper",
@@ -845,4 +843,8 @@ function getBlocks() {
   }
 
   return blocks;
+}
+
+export function makeColorVarName(color: string) {
+  return "@color" + color[0].toUpperCase() + color.slice(1);
 }

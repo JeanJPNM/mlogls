@@ -1,17 +1,20 @@
+import { Color } from "vscode-languageserver";
 import {
   blocks,
-  colors,
+  colorData,
   counterVar,
   globalReadonlyVariables,
   items,
   keywords,
   liquids,
+  makeColorVarName,
   mathConstants,
   sensors,
   soundNames,
   teams,
   units,
 } from "./constants";
+import { parseColor } from "./parser/tokens";
 
 export enum SymbolFlags {
   none = 0,
@@ -24,7 +27,8 @@ export enum SymbolFlags {
 export class NameSymbol {
   constructor(
     public name: string,
-    public flags: SymbolFlags
+    public flags: SymbolFlags,
+    public color?: Color
   ) {}
 
   get isKeyword() {
@@ -50,7 +54,7 @@ export const builtInSymbols = [
   ...globalReadonlyVariables.map(makeGlobal),
   new NameSymbol(counterVar, SymbolFlags.global | SymbolFlags.writeable),
   ...teams.map(makeGlobal),
-  ...colors.map(makeGlobal),
+  ...Object.keys(colorData).map(makeColorGlobal),
   ...items.map(makeGlobal),
   ...liquids.map(makeGlobal),
   ...blocks.map(makeGlobal),
@@ -113,4 +117,11 @@ export class SymbolTable {
 
 function makeGlobal(name: string) {
   return new NameSymbol(name, SymbolFlags.global);
+}
+
+function makeColorGlobal(name: string) {
+  const color = parseColor(colorData[name]);
+  const globalName = makeColorVarName(name);
+
+  return new NameSymbol(globalName, SymbolFlags.global, color);
 }

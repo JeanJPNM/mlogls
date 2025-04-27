@@ -29,7 +29,7 @@ import {
   TokenModifiers,
   TokenTypes,
 } from "./protocol";
-import { colorData, colorsSet, maxInstructionCount } from "./constants";
+import { colorData, maxInstructionCount } from "./constants";
 import { ParserDiagnostic } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
@@ -58,7 +58,6 @@ import {
 } from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
 import { findRange, findRangeIndex } from "./util/range_search";
-import { parseColor } from "./parser/tokens";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -145,7 +144,7 @@ export function startServer(options: LanguageServerOptions) {
 
       if (!value?.isColorLiteral()) return;
 
-      const { red, green, blue, alpha } = parseColor(value.content.slice(1));
+      const { red, green, blue, alpha } = value;
 
       const c = (value: number) => Math.round(value * 10 ** 3) / 10 ** 3;
 
@@ -294,14 +293,13 @@ export function startServer(options: LanguageServerOptions) {
       }
 
       for (const token of node.line.tokens) {
-        if (token.isIdentifier() && colorsSet.has(token.content)) {
-          // remove the leading @
-          const name = token.content.slice(1);
-          const color = parseColor(colorData[name]);
+        if (token.isIdentifier()) {
+          const symbol = doc.symbolTable.get(token.content);
+          if (!symbol?.color) continue;
 
           colors.push({
             range: Range.create(token.start, token.end),
-            color,
+            color: symbol.color,
           });
         } else if (token.isColorLiteral()) {
           colors.push({
