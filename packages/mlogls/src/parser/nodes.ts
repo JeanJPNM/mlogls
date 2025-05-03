@@ -1663,10 +1663,16 @@ export class SetRuleInstruction extends InstructionNode<
       lighting: {
         enabled: {},
       },
+      canGameOver: {
+        canIt: {},
+      },
       ambientLight: {
         color: {},
       },
       solarMultiplier: {
+        multiplier: {},
+      },
+      dragMultiplier: {
         multiplier: {},
       },
       ban: {
@@ -1684,6 +1690,10 @@ export class SetRuleInstruction extends InstructionNode<
         team: {},
       },
       unitBuildSpeed: {
+        multiplier: {},
+        team: {},
+      },
+      unitMineSpeed: {
         multiplier: {},
         team: {},
       },
