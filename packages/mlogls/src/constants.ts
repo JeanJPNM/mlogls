@@ -845,6 +845,10 @@ function getBlocks() {
   return blocks;
 }
 
+export function isColorName(name: string) {
+  return Object.prototype.hasOwnProperty.call(colorData, name);
+}
+
 export function makeColorVarName(color: string) {
   return "@color" + color[0].toUpperCase() + color.slice(1);
 }

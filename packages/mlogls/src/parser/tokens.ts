@@ -160,7 +160,7 @@ function parseStringColorTags(str: string): StringTokenTag[] {
           color = parseColor(str.slice(tagStart + 2, i));
         } else {
           const name = str.slice(tagStart + 1, i);
-          if (name in colorData) {
+          if (isColorName(name)) {
             color = parseColor(colorData[name]);
           }
         }
