@@ -434,6 +434,32 @@ export function startServer(options: LanguageServerOptions) {
       return;
     }
 
+    if (selectedToken?.isColorLiteral() && selectedToken.tag) {
+      const { tag } = selectedToken;
+      const offset = position.character - selectedToken.start.character;
+      if (tag.nameStart > offset || tag.nameEnd < offset) return;
+
+      const completions = CompletionList.create();
+
+      completions.itemDefaults = {
+        editRange: Range.create(
+          selectedToken.start.line,
+          selectedToken.start.character + tag.nameStart,
+          selectedToken.start.line,
+          selectedToken.start.character + tag.nameEnd
+        ),
+      };
+
+      for (const name in colorData) {
+        completions.items.push({
+          label: name,
+          kind: CompletionItemKind.Color,
+        });
+      }
+
+      return completions;
+    }
+
     const context: CompletionContext = {
       getVariableCompletions() {
         const completions: CompletionItem[] = [];

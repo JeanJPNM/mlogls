@@ -60,9 +60,25 @@ export abstract class SyntaxNode {
     }
 
     for (const token of this.line.tokens) {
-      if (!token.isString()) continue;
+      if (token.isString()) {
+        for (const tag of token.colorTags) {
+          if (tag.nameStart === tag.nameEnd || tag.color) continue;
 
-      for (const tag of token.colorTags) {
+          const name = token.content.slice(tag.nameStart, tag.nameEnd);
+          diagnostics.push({
+            range: Range.create(
+              token.start.line,
+              token.start.character + tag.nameStart,
+              token.start.line,
+              token.start.character + tag.nameEnd
+            ),
+            message: `Unknown color name: ${name}`,
+            severity: DiagnosticSeverity.Warning,
+            code: DiagnosticCode.unknownColorName,
+          });
+        }
+      } else if (token.isColorLiteral() && token.tag) {
+        const { tag } = token;
         if (tag.nameStart === tag.nameEnd || tag.color) continue;
 
         const name = token.content.slice(tag.nameStart, tag.nameEnd);
@@ -105,12 +121,24 @@ export abstract class SyntaxNode {
       this.line.tokens
     );
 
-    if (!token?.isString()) return;
+    if (token?.isString()) {
+      const offset = diagnostic.range.start.character - token.start.character;
+      for (const tag of token.colorTags) {
+        if (tag.nameStart > offset || tag.nameEnd < offset) continue;
+        const name = token.content.slice(tag.nameStart, tag.nameEnd);
+        const suggestion = getSpellingSuggestionForName(
+          name,
+          Object.keys(colorData)
+        );
+        if (!suggestion) return;
 
-    const offset = diagnostic.range.start.character - token.start.character;
+        actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+      }
+    } else if (token?.isColorLiteral() && token.tag) {
+      const offset = diagnostic.range.start.character - token.start.character;
+      const tag = token.tag;
+      if (tag.nameStart > offset || tag.nameEnd < offset) return;
 
-    for (const tag of token.colorTags) {
-      if (tag.nameStart > offset || tag.nameEnd < offset) continue;
       const name = token.content.slice(tag.nameStart, tag.nameEnd);
       const suggestion = getSpellingSuggestionForName(
         name,

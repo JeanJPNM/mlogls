@@ -1,5 +1,5 @@
 import { Color, Position } from "vscode-languageserver";
-import { colorData } from "../constants";
+import { colorData, isColorName } from "../constants";
 
 export class ParserPosition implements Position {
   constructor(
@@ -93,6 +93,7 @@ export class NumberToken extends TextToken {
 }
 
 export class ColorLiteralToken extends TextToken {
+  tag?: StringTokenTag;
   red: number;
   green: number;
   blue: number;
@@ -104,12 +105,20 @@ export class ColorLiteralToken extends TextToken {
     public content: string
   ) {
     super();
-    const { red, green, blue, alpha } = parseColor(content.slice(1));
+    const tagged = content[1] === "[";
+    const color = parseColorLiteral(content, tagged);
 
-    this.red = red;
-    this.green = green;
-    this.blue = blue;
-    this.alpha = alpha;
+    this.red = color?.red ?? 0;
+    this.green = color?.green ?? 0;
+    this.blue = color?.blue ?? 0;
+    this.alpha = color?.alpha ?? 1;
+    if (tagged) {
+      this.tag = {
+        nameStart: 2,
+        nameEnd: content.length - 1,
+        color,
+      };
+    }
   }
 }
 
@@ -123,6 +132,16 @@ export function parseColor(color: string): Color {
   const alpha = color.length === 8 ? parseInt(color.slice(6, 8), 16) / 255 : 1;
 
   return { red, green, blue, alpha };
+}
+
+function parseColorLiteral(content: string, named: boolean): Color | undefined {
+  // check if tag uses hex code instead of color name
+  if (!named) return parseColor(content.slice(1));
+
+  const name = content.slice(2, -1);
+
+  if (!isColorName(name)) return;
+  return parseColor(colorData[name]);
 }
 
 function parseStringColorTags(str: string): StringTokenTag[] {

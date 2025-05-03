@@ -142,8 +142,13 @@ export function tokenize(chars: string) {
     const endPos = pos;
     const content = chars.slice(startPos, endPos);
     if (
-      content.startsWith("%") &&
-      (content.length === 7 || content.length === 9)
+      // mindustry will only treat this token as a named
+      // color literal if it has more than three characters
+      // but we won't apply that constraint since
+      // it messes up autocomplete when writing a named color literal
+      (content.startsWith("%[") && content.endsWith("]")) ||
+      (content.startsWith("%") &&
+        (content.length === 7 || content.length === 9))
     )
       return new ColorLiteralToken(start, end, content);
     if (!isNaN(Number(content))) return new NumberToken(start, end, content);

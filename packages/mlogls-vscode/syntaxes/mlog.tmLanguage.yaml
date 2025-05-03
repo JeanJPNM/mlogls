@@ -25,6 +25,9 @@ repository:
       - comment: Match hexadecimal numbers and color literals
         name: constant.numeric.hex.mlog
         match: (?<=\s|^)(0x|%)[a-fA-F0-9]+(?=\s|$|;)
+      - comment: Match named color literals
+        name: constant.numeric.mlog
+        match: (?<=\s|^)%\[[a-zA-Z]+\](?=\s|$|;)
       - name: constant.numeric.binary.mlog
         match: (?<=\s|^)(?i:(0b[01]+))(?=\s|$|;)
       - name: constant.numeric.decimal.mlog
