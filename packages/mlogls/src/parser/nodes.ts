@@ -991,6 +991,7 @@ export class LookupInstruction extends InstructionNode<
       unit: { result: { isOutput: true }, id: {} },
       item: { result: { isOutput: true }, id: {} },
       liquid: { result: { isOutput: true }, id: {} },
+      team: { result: { isOutput: true }, id: {} },
     },
   });
 
