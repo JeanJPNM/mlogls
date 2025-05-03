@@ -21,6 +21,7 @@ export const globalReadonlyVariables = [
   "@waveTime",
   "@mapw",
   "@maph",
+  "@wait",
   "@server",
   "@client",
   "@clientLocale",
