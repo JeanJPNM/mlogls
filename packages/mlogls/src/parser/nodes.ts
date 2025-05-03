@@ -586,6 +586,10 @@ export class DrawInstruction extends InstructionNode<
           },
         },
       },
+      translate: { x: {}, y: {} },
+      scale: { x: {}, y: {} },
+      rotate: { degrees: {} },
+      reset: {},
     },
   });
 
