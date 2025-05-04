@@ -2,6 +2,9 @@ export const maxLabelCount = 500;
 
 export const maxInstructionCount = 1000;
 
+export const counterVar = "@counter";
+export const waitVar = "@wait";
+
 export const keywords = ["true", "false", "null"];
 
 export const mathConstants = ["@pi", "@e", "@degToRad", "@radToDeg"];
@@ -21,7 +24,7 @@ export const globalReadonlyVariables = [
   "@waveTime",
   "@mapw",
   "@maph",
-  "@wait",
+  waitVar,
   "@server",
   "@client",
   "@clientLocale",
@@ -37,8 +40,6 @@ export const globalReadonlyVariables = [
   "@unitCount",
   "@blockCount",
 ];
-
-export const counterVar = "@counter";
 
 const buildingBlockNames = [
   "graphite-press",

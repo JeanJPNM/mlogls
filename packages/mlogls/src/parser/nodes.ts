@@ -27,7 +27,7 @@ import {
   InstructionParameter,
   ParameterUsage,
 } from "./descriptors";
-import { colorData, counterVar } from "../constants";
+import { colorData, counterVar, waitVar } from "../constants";
 import {
   CompletionContext,
   getLabelNames,
@@ -1754,6 +1754,15 @@ export class FlushMessageInstruction extends InstructionNode<
 
   static parse(this: void, line: TokenLine) {
     const data = FlushMessageInstruction.descriptor.parse(line.tokens);
+
+    // hardcoding it like this feels bad
+    // but I don't want to add a feature to the descriptor system
+    // just because this single instruction wants to do
+    // things this way
+    const successParam = data[1][2];
+    if (successParam?.token.content === waitVar) {
+      successParam.usage = ParameterUsage.read;
+    }
 
     return new FlushMessageInstruction(line, ...data);
   }
