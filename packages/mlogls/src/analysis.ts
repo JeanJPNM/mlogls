@@ -82,7 +82,7 @@ export function getSymbolTable(nodes: SyntaxNode[]) {
         continue;
       }
 
-      if (param.usage === ParameterUsage.write) {
+      if (param.usage === ParameterUsage.write && name !== "_") {
         table.insert(new NameSymbol(name, SymbolFlags.writeable));
       }
     }
@@ -478,9 +478,10 @@ export function validateVariableUsage(
       )
         continue;
 
-      if (!param.token.isIdentifier() || param.token.content === "_") continue;
+      if (!param.token.isIdentifier()) continue;
 
       const name = param.token.content;
+      if (param.usage === ParameterUsage.ignored && name === "_") continue;
       unusedVariables.delete(name);
 
       if (symbolTable.has(name)) continue;
