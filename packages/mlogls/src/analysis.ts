@@ -474,11 +474,11 @@ export function validateVariableUsage(
     for (const param of node.parameters) {
       if (
         param.type !== ParameterType.variable ||
-        param.usage !== ParameterUsage.read
+        param.usage === ParameterUsage.write
       )
         continue;
 
-      if (!param.token.isIdentifier()) continue;
+      if (!param.token.isIdentifier() || param.token.content === "_") continue;
 
       const name = param.token.content;
       unusedVariables.delete(name);
