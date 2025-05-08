@@ -93,6 +93,7 @@ export interface InstructionDescriptor<Data> {
   provideDiagnostics(
     table: SymbolTable,
     data: Data,
+    tokens: TextToken[],
     parameters: InstructionParameter[],
     diagnostics: ParserDiagnostic[]
   ): void;
@@ -149,8 +150,8 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       return [getDescriptorSignature(descriptor, name)];
     },
 
-    provideDiagnostics(table, data, parameters, diagnostics) {
-      validateMembers(descriptor, data, diagnostics);
+    provideDiagnostics(table, data, tokens, parameters, diagnostics) {
+      validateMembers(descriptor, data, tokens, diagnostics);
       validateParameters(table, parameters, diagnostics);
     },
     provideCodeActions(doc, diagnostic, data, tokens, actions) {
@@ -343,7 +344,7 @@ export function createOverloadDescriptor<
 
       return context.getVariableCompletions();
     },
-    provideDiagnostics(table, data, parameters, diagnostics) {
+    provideDiagnostics(table, data, tokens, parameters, diagnostics) {
       if (data.$type === "unknown" && data.typeToken) {
         let message = `Unknown ${name} type: ${data.typeToken.content}`;
 
@@ -368,8 +369,16 @@ export function createOverloadDescriptor<
         validateMembers(
           descriptor,
           data as DescriptorData<typeof descriptor>,
+          tokens,
           diagnostics
         );
+      } else {
+        diagnostics.push({
+          range: tokens[0],
+          message: "Incomplete instruction",
+          code: DiagnosticCode.missingParameters,
+          severity: DiagnosticSeverity.Warning,
+        });
       }
 
       validateParameters(table, parameters, diagnostics);
@@ -512,11 +521,18 @@ function getDescriptorSignature<const T extends SingleDescriptor>(
 export function validateMembers<T extends SingleDescriptor>(
   descriptor: T,
   data: DescriptorData<T>,
+  tokens: TextToken[],
   diagnostics: ParserDiagnostic[]
 ) {
+  const missing: string[] = [];
   for (const key in descriptor) {
     const token = data[key];
-    if (!token) break;
+
+    if (!token) {
+      missing.push(key);
+      continue;
+    }
+
     const param = descriptor[key];
 
     if (param.restrict) {
@@ -527,6 +543,18 @@ export function validateMembers<T extends SingleDescriptor>(
         param.restrict.invalidPrefix
       );
     }
+  }
+
+  if (missing.length > 0) {
+    diagnostics.push({
+      message:
+        missing.length === 1
+          ? `Missing parameter: ${missing[0]}`
+          : `Missing parameters: ${missing.join(", ")}`,
+      range: tokens[0],
+      code: DiagnosticCode.missingParameters,
+      severity: DiagnosticSeverity.Warning,
+    });
   }
 }
 

@@ -279,6 +279,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     this.descriptor.provideDiagnostics(
       doc.symbolTable,
       this.data,
+      this.line.tokens,
       this.parameters,
       diagnostics
     );
