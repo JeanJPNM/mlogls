@@ -65,14 +65,25 @@ export abstract class SyntaxNode {
           if (tag.nameStart === tag.nameEnd || tag.color) continue;
 
           const name = token.content.slice(tag.nameStart, tag.nameEnd);
+
+          let message = `Unknown color name: ${name}`;
+          const suggestion = getSpellingSuggestionForName(
+            name,
+            Object.keys(colorData)
+          );
+
+          if (suggestion) {
+            message += `. Did you mean '${suggestion}'?`;
+          }
+
           diagnostics.push({
+            message,
             range: Range.create(
               token.start.line,
               token.start.character + tag.nameStart,
               token.start.line,
               token.start.character + tag.nameEnd
             ),
-            message: `Unknown color name: ${name}`,
             severity: DiagnosticSeverity.Warning,
             code: DiagnosticCode.unknownColorName,
           });
@@ -82,14 +93,25 @@ export abstract class SyntaxNode {
         if (tag.nameStart === tag.nameEnd || tag.color) continue;
 
         const name = token.content.slice(tag.nameStart, tag.nameEnd);
+
+        let message = `Unknown color name: ${name}`;
+        const suggestion = getSpellingSuggestionForName(
+          name,
+          Object.keys(colorData)
+        );
+
+        if (suggestion) {
+          message += `. Did you mean '${suggestion}'?`;
+        }
+
         diagnostics.push({
+          message,
           range: Range.create(
             token.start.line,
             token.start.character + tag.nameStart,
             token.start.line,
             token.start.character + tag.nameEnd
           ),
-          message: `Unknown color name: ${name}`,
           severity: DiagnosticSeverity.Warning,
           code: DiagnosticCode.unknownColorName,
         });
