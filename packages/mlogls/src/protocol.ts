@@ -73,7 +73,7 @@ export enum DiagnosticCode {
   unclosedString = "unclosed-string",
   unknownColorName = "unknown-color-name",
   preferJumpLabels = "prefer-jump-labels",
-  missingParameters = "missing-parameters",
+  incompleteInstruction = "incomplete-instruction",
 }
 
 export enum CommandCode {

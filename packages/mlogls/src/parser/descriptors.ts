@@ -376,7 +376,7 @@ export function createOverloadDescriptor<
         diagnostics.push({
           range: tokens[0],
           message: "Incomplete instruction",
-          code: DiagnosticCode.missingParameters,
+          code: DiagnosticCode.incompleteInstruction,
           severity: DiagnosticSeverity.Warning,
         });
       }
@@ -552,7 +552,7 @@ export function validateMembers<T extends SingleDescriptor>(
           ? `Missing parameter: ${missing[0]}`
           : `Missing parameters: ${missing.join(", ")}`,
       range: tokens[0],
-      code: DiagnosticCode.missingParameters,
+      code: DiagnosticCode.incompleteInstruction,
       severity: DiagnosticSeverity.Warning,
     });
   }
