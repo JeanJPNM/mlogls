@@ -914,6 +914,7 @@ export class OpInstruction extends InstructionNode<
       len: { result: { isOutput: true }, x: {}, y: {} },
       noise: { result: { isOutput: true }, a: {}, b: {} },
       abs: { result: { isOutput: true }, x: {} },
+      sign: { result: { isOutput: true }, x: {} },
       log: { result: { isOutput: true }, x: {} },
       log10: { result: { isOutput: true }, x: {} },
       floor: { result: { isOutput: true }, x: {} },
