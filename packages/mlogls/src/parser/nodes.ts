@@ -1141,6 +1141,28 @@ export class PackColorInstruction extends InstructionNode<
     return { red, green, blue, alpha };
   }
 }
+export class UnpackColorInstruction extends InstructionNode<
+  DataOf<typeof UnpackColorInstruction>
+> {
+  descriptor = UnpackColorInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "unpackcolor",
+    descriptor: {
+      red: { isOutput: true },
+      green: { isOutput: true },
+      blue: { isOutput: true },
+      alpha: { isOutput: true },
+      value: {},
+    },
+  });
+
+  static parse(this: void, line: TokenLine) {
+    const data = UnpackColorInstruction.descriptor.parse(line.tokens);
+
+    return new UnpackColorInstruction(line, ...data);
+  }
+}
 
 export class EndInstruction extends InstructionNode<
   DataOf<typeof EndInstruction>
@@ -2344,6 +2366,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   stop: StopInstruction.parse,
   lookup: LookupInstruction.parse,
   packcolor: PackColorInstruction.parse,
+  unpackcolor: UnpackColorInstruction.parse,
   end: EndInstruction.parse,
   jump: JumpInstruction.parse,
   ubind: UnitBindInstruction.parse,
