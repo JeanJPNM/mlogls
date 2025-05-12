@@ -284,7 +284,7 @@ export function validateLabelUsage(
         code: DiagnosticCode.preferJumpLabels,
       });
 
-      const address = Number(destination.content);
+      const address = destination.value;
       if (address < 0 || address >= instructionCount) {
         diagnostics.push({
           range: destination,

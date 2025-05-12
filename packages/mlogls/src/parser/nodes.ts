@@ -1127,16 +1127,16 @@ export class PackColorInstruction extends InstructionNode<
   getColor() {
     const { data } = this;
     let red = 0;
-    if (data.red?.isNumber()) red = Number(data.red.content);
+    if (data.red?.isNumber()) red = data.red.value;
 
     let green = 0;
-    if (data.green?.isNumber()) green = Number(data.green.content);
+    if (data.green?.isNumber()) green = data.green.value;
 
     let blue = 0;
-    if (data.blue?.isNumber()) blue = Number(data.blue.content);
+    if (data.blue?.isNumber()) blue = data.blue.value;
 
     let alpha = 1;
-    if (data.alpha?.isNumber()) alpha = Number(data.alpha.content);
+    if (data.alpha?.isNumber()) alpha = data.alpha.value;
 
     return { red, green, blue, alpha };
   }

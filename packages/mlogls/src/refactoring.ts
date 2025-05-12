@@ -38,7 +38,7 @@ export function convertToLabeledJumps(doc: MlogDocument): TextEdit[] {
     if (!destination?.isNumber()) continue;
 
     // convert negative indexes to 0
-    const index = Math.max(Number(destination.content), 0);
+    const index = Math.max(destination.value, 0);
 
     if (referencedIndexes.has(index)) {
       referencedIndexes.get(index)!.push(node);
