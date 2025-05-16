@@ -265,6 +265,14 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     super(line);
   }
 
+  get affectsControlFlow() {
+    for (const param of this.parameters) {
+      if (param.usage !== ParameterUsage.write) continue;
+      if (param.token.content === counterVar) return true;
+    }
+    return false;
+  }
+
   provideCompletionItems(
     context: CompletionContext,
     character: number
@@ -286,6 +294,12 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
   }
 
   provideTokenSemantics(doc: MlogDocument, tokens: TokenSemanticData[]): void {
+    if (this.affectsControlFlow) {
+      tokens.push({
+        token: this.line.tokens[0],
+        type: TokenTypes.keyword,
+      });
+    }
     this.descriptor.provideTokenSemantics(
       doc.symbolTable,
       this.parameters,
@@ -858,19 +872,6 @@ export class SetInstruction extends InstructionNode<
 
     return new SetInstruction(line, ...data);
   }
-
-  provideTokenSemantics(doc: MlogDocument, tokens: TokenSemanticData[]): void {
-    // this tells the editor that this particular
-    // use of the set instruction affects the control flow
-    // just like jump
-    if (this.data.variable?.content === counterVar) {
-      tokens.push({
-        token: this.line.tokens[0],
-        type: TokenTypes.keyword,
-      });
-    }
-    super.provideTokenSemantics(doc, tokens);
-  }
 }
 
 export class OpInstruction extends InstructionNode<
@@ -936,22 +937,6 @@ export class OpInstruction extends InstructionNode<
       ...OpInstruction.descriptor.parse(line.tokens)
     );
   }
-
-  provideTokenSemantics(doc: MlogDocument, tokens: TokenSemanticData[]): void {
-    // this tells the editor that this particular
-    // use of the set instruction affects the control flow
-    // just like jump
-    if (
-      this.data.$type !== "unknown" &&
-      this.data.result?.content === counterVar
-    ) {
-      tokens.push({
-        token: this.line.tokens[0],
-        type: TokenTypes.keyword,
-      });
-    }
-    super.provideTokenSemantics(doc, tokens);
-  }
 }
 
 export class WaitInstruction extends InstructionNode<
@@ -971,6 +956,10 @@ export class WaitInstruction extends InstructionNode<
 
     return new WaitInstruction(line, ...data);
   }
+
+  get affectsControlFlow() {
+    return true;
+  }
 }
 
 export class StopInstruction extends InstructionNode<
@@ -988,6 +977,10 @@ export class StopInstruction extends InstructionNode<
       line,
       ...StopInstruction.descriptor.parse(line.tokens)
     );
+  }
+
+  get affectsControlFlow() {
+    return true;
   }
 
   provideSignatureHelp(_character: number): SignatureHelp {
@@ -1181,6 +1174,10 @@ export class EndInstruction extends InstructionNode<
       ...EndInstruction.descriptor.parse(line.tokens)
     );
   }
+
+  get affectsControlFlow() {
+    return true;
+  }
 }
 
 export class JumpInstruction extends InstructionNode<
@@ -1209,6 +1206,10 @@ export class JumpInstruction extends InstructionNode<
     const data = JumpInstruction.descriptor.parse(line.tokens);
 
     return new JumpInstruction(line, ...data);
+  }
+
+  get affectsControlFlow() {
+    return true;
   }
 
   provideCompletionItems(
