@@ -13,6 +13,7 @@ import {
   soundNames,
   teams,
   units,
+  weatherNames,
 } from "./constants";
 import { parseColor } from "./parser/tokens";
 
@@ -61,6 +62,7 @@ export const builtInSymbols = [
   ...sensors.map(makeGlobal),
   ...units.map(makeGlobal),
   ...soundNames.map(makeGlobal),
+  ...weatherNames.map(makeGlobal),
 ];
 
 export const builtInSymbolMap = new Map(

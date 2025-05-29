@@ -794,21 +794,14 @@ export const soundNames = [
   "@sfx-unlock",
 ];
 
-export const builtinGlobals = [
-  ...mathConstants,
-  ...globalReadonlyVariables,
-  counterVar,
-  ...teams,
-  ...colors,
-  ...items,
-  ...liquids,
-  ...blocks,
-  ...sensors,
-  ...units,
-  ...soundNames,
+export const weatherNames = [
+  "@snowing",
+  "@rain",
+  "@sandstorm",
+  "@sporestorm",
+  "@fog",
+  "@suspend-particles",
 ];
-
-export const builtinGlobalsSet = new Set(builtinGlobals);
 
 export const buildingLinkNames = getBuildingLinkNames();
 
