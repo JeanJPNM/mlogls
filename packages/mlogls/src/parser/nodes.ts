@@ -1364,6 +1364,8 @@ const unitLocateGroups = [
   "repair",
   "battery",
   "reactor",
+  "drill",
+  "shield",
 ];
 
 export class UnitLocateInstruction extends InstructionNode<
