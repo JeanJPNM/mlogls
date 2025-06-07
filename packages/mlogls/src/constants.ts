@@ -805,6 +805,8 @@ export const weatherNames = [
 
 export const buildingLinkNames = getBuildingLinkNames();
 
+export const stringTemplatePattern = /{[0-9]}/;
+
 function getBuildingLinkNames() {
   const names = new Set<string>();
 

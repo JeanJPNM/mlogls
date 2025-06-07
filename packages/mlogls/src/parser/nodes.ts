@@ -27,7 +27,12 @@ import {
   InstructionParameter,
   ParameterUsage,
 } from "./descriptors";
-import { colorData, counterVar, waitVar } from "../constants";
+import {
+  colorData,
+  counterVar,
+  stringTemplatePattern,
+  waitVar,
+} from "../constants";
 import {
   CompletionContext,
   getLabelNames,
@@ -65,6 +70,10 @@ export abstract class SyntaxNode {
           if (tag.nameStart === tag.nameEnd || tag.color) continue;
 
           const name = token.content.slice(tag.nameStart, tag.nameEnd);
+
+          // name includes format string,
+          // it's up to the user to make sure its valid
+          if (name.match(stringTemplatePattern)) continue;
 
           let message = `Unknown color name: ${name}`;
           const suggestion = getSpellingSuggestionForName(

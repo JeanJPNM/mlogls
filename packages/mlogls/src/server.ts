@@ -29,7 +29,11 @@ import {
   TokenModifiers,
   TokenTypes,
 } from "./protocol";
-import { colorData, maxInstructionCount } from "./constants";
+import {
+  colorData,
+  maxInstructionCount,
+  stringTemplatePattern,
+} from "./constants";
 import { ParserDiagnostic } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
@@ -314,6 +318,10 @@ export function startServer(options: LanguageServerOptions) {
         } else if (token.isString()) {
           for (const tag of token.colorTags) {
             if (!tag.color) continue;
+
+            const tagContent = token.content.slice(tag.nameStart, tag.nameEnd);
+
+            if (tagContent.match(stringTemplatePattern)) continue;
 
             const start = token.start.character + tag.nameStart;
             const end = token.start.character + tag.nameEnd;
