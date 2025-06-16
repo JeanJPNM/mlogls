@@ -234,6 +234,13 @@ export function validateLabelUsage(
     if (node instanceof InstructionNode) {
       instructionCount++;
     }
+  }
+
+  let labelAddress = 0;
+  for (const node of nodes) {
+    if (node instanceof InstructionNode) {
+      labelAddress++;
+    }
     if (!(node instanceof LabelDeclaration)) continue;
     labelCount++;
 
@@ -243,6 +250,15 @@ export function validateLabelUsage(
         message: `Exceeded maximum label count of ${maxLabelCount}`,
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.tooManyLabels,
+      });
+    }
+
+    if (labelAddress === instructionCount) {
+      diagnostics.push({
+        range: node.nameToken,
+        message: `The label '${node.name}' does not precede any instruction`,
+        severity: DiagnosticSeverity.Warning,
+        code: DiagnosticCode.labelWithoutInstruction,
       });
     }
 

@@ -74,6 +74,7 @@ export enum DiagnosticCode {
   unknownColorName = "unknown-color-name",
   preferJumpLabels = "prefer-jump-labels",
   incompleteInstruction = "incomplete-instruction",
+  labelWithoutInstruction = "label-without-instruction",
 }
 
 export enum CommandCode {
