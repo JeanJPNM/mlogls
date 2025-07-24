@@ -606,7 +606,7 @@ export const sensors = [
   "@cameraHeight",
   "@displayWidth",
   "@displayHeight",
-  "@bufferUsage",
+  "@bufferSize",
   "@operations",
   "@size",
   "@solid",
