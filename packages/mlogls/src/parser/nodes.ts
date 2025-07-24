@@ -1267,14 +1267,14 @@ export class SelectInstruction extends InstructionNode<
       result: { isOutput: true },
     },
     overloads: {
-      equal: { x: {}, y: {}, a: {}, b: {} },
-      notEqual: { x: {}, y: {}, a: {}, b: {} },
-      lessThan: { x: {}, y: {}, a: {}, b: {} },
-      lessThanEq: { x: {}, y: {}, a: {}, b: {} },
-      greaterThan: { x: {}, y: {}, a: {}, b: {} },
-      greaterThanEq: { x: {}, y: {}, a: {}, b: {} },
-      strictEqual: { x: {}, y: {}, a: {}, b: {} },
-      always: { x: {}, y: {}, a: {} },
+      equal: { x: {}, y: {}, whenTrue: {}, whenFalse: {} },
+      notEqual: { x: {}, y: {}, whenTrue: {}, whenFalse: {} },
+      lessThan: { x: {}, y: {}, whenTrue: {}, whenFalse: {} },
+      lessThanEq: { x: {}, y: {}, whenTrue: {}, whenFalse: {} },
+      greaterThan: { x: {}, y: {}, whenTrue: {}, whenFalse: {} },
+      greaterThanEq: { x: {}, y: {}, whenTrue: {}, whenFalse: {} },
+      strictEqual: { x: {}, y: {}, whenTrue: {}, whenFalse: {} },
+      always: { _x: {}, _y: {}, value: {} },
     },
   });
 
