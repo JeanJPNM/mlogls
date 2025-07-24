@@ -1256,6 +1256,35 @@ export class JumpInstruction extends InstructionNode<
   }
 }
 
+export class SelectInstruction extends InstructionNode<
+  DataOf<typeof SelectInstruction>
+> {
+  descriptor = SelectInstruction.descriptor;
+
+  static readonly descriptor = createOverloadDescriptor({
+    name: "select",
+    pre: {
+      result: { isOutput: true },
+    },
+    overloads: {
+      equal: { x: {}, y: {}, a: {}, b: {} },
+      notEqual: { x: {}, y: {}, a: {}, b: {} },
+      lessThan: { x: {}, y: {}, a: {}, b: {} },
+      lessThanEq: { x: {}, y: {}, a: {}, b: {} },
+      greaterThan: { x: {}, y: {}, a: {}, b: {} },
+      greaterThanEq: { x: {}, y: {}, a: {}, b: {} },
+      strictEqual: { x: {}, y: {}, a: {}, b: {} },
+      always: { x: {}, y: {}, a: {} },
+    },
+  });
+
+  static parse(this: void, line: TokenLine) {
+    const data = SelectInstruction.descriptor.parse(line.tokens);
+
+    return new SelectInstruction(line, ...data);
+  }
+}
+
 export class UnitBindInstruction extends InstructionNode<
   DataOf<typeof UnitBindInstruction>
 > {
@@ -2383,6 +2412,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   unpackcolor: UnpackColorInstruction.parse,
   end: EndInstruction.parse,
   jump: JumpInstruction.parse,
+  select: SelectInstruction.parse,
   ubind: UnitBindInstruction.parse,
   ucontrol: UnitControlInstruction.parse,
   uradar: UnitRadarinstruction.parse,
