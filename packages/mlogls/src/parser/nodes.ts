@@ -615,22 +615,7 @@ export class DrawInstruction extends InstructionNode<
       print: {
         x: {},
         y: {},
-        alignment: {
-          restrict: {
-            invalidPrefix: "Invalid print alignment: ",
-            values: [
-              "center",
-              "top",
-              "bottom",
-              "left",
-              "right",
-              "topLeft",
-              "topRight",
-              "bottomLeft",
-              "bottomRight",
-            ],
-          },
-        },
+        alignment: {},
       },
       translate: { x: {}, y: {} },
       scale: { x: {}, y: {} },

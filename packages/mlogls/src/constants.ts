@@ -39,6 +39,17 @@ export const globalReadonlyVariables = [
   "@liquidCount",
   "@unitCount",
   "@blockCount",
+
+  // draw print alignments
+  "@center",
+  "@top",
+  "@bottom",
+  "@left",
+  "@right",
+  "@topLeft",
+  "@topRight",
+  "@bottomLeft",
+  "@bottomRight",
 ];
 
 const buildingBlockNames = [
