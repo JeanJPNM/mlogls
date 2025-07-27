@@ -23,6 +23,7 @@ import { TextToken } from "./tokens";
 import { SymbolTable } from "../symbol";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { MlogDocument } from "../document";
+import { ignoreToken } from "../constants";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -567,7 +568,7 @@ export function validateParameters(
     switch (param.usage) {
       case ParameterUsage.ignored:
         if (param.type === ParameterType.enumMember) break;
-        if (param.token.content === "_") break;
+        if (param.token.content === ignoreToken) break;
 
         diagnostics.push({
           range: param.token,
@@ -589,6 +590,7 @@ export function validateParameters(
         break;
       case ParameterUsage.write: {
         if (param.type !== ParameterType.variable) break;
+        if (param.token.content === ignoreToken) break;
 
         if (!param.token.isIdentifier()) {
           diagnostics.push({
@@ -754,6 +756,17 @@ function provideSemantics(
         });
         break;
       case ParameterType.variable: {
+        if (
+          param.usage !== ParameterUsage.read &&
+          param.token.content === ignoreToken
+        ) {
+          tokens.push({
+            token: param.token,
+            type: TokenTypes.macro,
+            modifiers: 0,
+          });
+          break;
+        }
         if (!param.token.isIdentifier()) break;
 
         const symbol = table.get(param.token.content);

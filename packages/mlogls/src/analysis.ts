@@ -15,7 +15,7 @@ import {
 import { ParserDiagnostic } from "./parser/tokenize";
 import { MlogDocument } from "./document";
 import { DiagnosticCode } from "./protocol";
-import { buildingLinkNames, maxLabelCount } from "./constants";
+import { buildingLinkNames, ignoreToken, maxLabelCount } from "./constants";
 import { ParserPosition, TextToken } from "./parser/tokens";
 import { NameSymbol, SymbolFlags, SymbolTable } from "./symbol";
 import { getSpellingSuggestionForName } from "./util/spelling";
@@ -82,7 +82,7 @@ export function getSymbolTable(nodes: SyntaxNode[]) {
         continue;
       }
 
-      if (param.usage === ParameterUsage.write && name !== "_") {
+      if (param.usage === ParameterUsage.write && name !== ignoreToken) {
         table.insert(new NameSymbol(name, SymbolFlags.writeable));
       }
     }
@@ -497,7 +497,8 @@ export function validateVariableUsage(
       if (!param.token.isIdentifier()) continue;
 
       const name = param.token.content;
-      if (param.usage === ParameterUsage.ignored && name === "_") continue;
+      if (param.usage === ParameterUsage.ignored && name === ignoreToken)
+        continue;
       unusedVariables.delete(name);
 
       if (symbolTable.has(name)) continue;
@@ -527,7 +528,7 @@ export function validateVariableUsage(
       )
         continue;
 
-      if (param.token.content === "_") continue;
+      if (param.token.content === ignoreToken) continue;
       if (!unusedVariables.has(param.token.content)) continue;
 
       diagnostics.push({

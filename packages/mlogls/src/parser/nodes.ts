@@ -30,6 +30,7 @@ import {
 import {
   colorData,
   counterVar,
+  ignoreToken,
   stringTemplatePattern,
   waitVar,
 } from "../constants";
@@ -334,10 +335,10 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
       case DiagnosticCode.ignoredValue:
       case DiagnosticCode.unusedVariable:
         actions.push({
-          title: "Replace with _",
+          title: `Replace with ${ignoreToken}`,
           edit: {
             changes: {
-              [doc.uri]: [TextEdit.replace(diagnostic.range, "_")],
+              [doc.uri]: [TextEdit.replace(diagnostic.range, ignoreToken)],
             },
           },
           diagnostics: [diagnostic],

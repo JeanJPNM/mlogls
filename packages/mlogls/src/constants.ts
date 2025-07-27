@@ -4,6 +4,7 @@ export const maxInstructionCount = 1000;
 
 export const counterVar = "@counter";
 export const waitVar = "@wait";
+export const ignoreToken = "0";
 
 export const keywords = ["true", "false", "null"];
 
