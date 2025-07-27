@@ -580,6 +580,7 @@ export function validateParameters(
         });
         break;
       case ParameterUsage.unused:
+        if (param.token.content === ignoreToken) break;
         diagnostics.push({
           range: param.token,
           message: "Unused parameter",
