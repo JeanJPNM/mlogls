@@ -918,6 +918,7 @@ export class OpInstruction extends InstructionNode<
       log10: { result: { isOutput: true }, x: {} },
       floor: { result: { isOutput: true }, x: {} },
       ceil: { result: { isOutput: true }, x: {} },
+      round: { result: { isOutput: true }, x: {} },
       sqrt: { result: { isOutput: true }, x: {} },
       rand: { result: { isOutput: true }, max: {} },
       sin: { result: { isOutput: true }, degrees: {} },
