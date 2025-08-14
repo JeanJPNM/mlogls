@@ -1,6 +1,7 @@
 name: Tagged Production Deploys for the Language Server
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "mlogls-*"

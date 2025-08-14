@@ -1,6 +1,7 @@
 name: Tagged Production Deploys for VS Code
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - "mlogls-vscode-*"
