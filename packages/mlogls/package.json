@@ -17,10 +17,10 @@
   },
   "exports": {
     ".": {
-      "import": "./dist/server.js",
-      "require": "./dist/server.cjs",
       "node": "./dist/server.cjs",
-      "types": "./dist/server.d.ts"
+      "import": "./dist/server.js",
+      "types": "./dist/server.d.ts",
+      "require": "./dist/server.cjs"
     }
   },
   "homepage": "https://github.com/JeanJPNM/mlogls#readme",
