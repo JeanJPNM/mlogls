@@ -20,22 +20,38 @@ repository:
   number:
     patterns:
       # the lookaheads and lookbehinds are to ensure that the number is not part of an identifier
-      - name: keyword.operator.arithmetic.mlog
-        match: "-"
-      - comment: Match hexadecimal numbers and color literals
+      - comment: Match hexadecimal numbers
         name: constant.numeric.hex.mlog
-        match: (?<=\s|^)(0x|%)[a-fA-F0-9]+(?=\s|$|;)
+        match: (?<=\s|^)([+-])?0x[a-fA-F0-9]+(?=\s|$|;)
+        captures:
+          1:
+            name: keyword.operator.arithmetic.mlog
+      - comment: Match hexadecimal color literals
+        name: constant.numeric.hex.mlog
+        match: (?<=\s|^)%[a-fA-F0-9]+(?=\s|$|;)
       - comment: Match named color literals
         name: constant.numeric.mlog
         match: (?<=\s|^)%\[[a-zA-Z]+\](?=\s|$|;)
       - name: constant.numeric.binary.mlog
-        match: (?<=\s|^)(?i:(0b[01]+))(?=\s|$|;)
+        match: (?<=\s|^)([+-])?(?i:(0b[01]+))(?=\s|$|;)
+        captures:
+          1:
+            name: keyword.operator.arithmetic.mlog
       - name: constant.numeric.decimal.mlog
-        match: (?<=\s|^|-)\d+(\.\d+)?(?=\s|$|;)
+        match: (?<=\s|^)([+-])?\d+(\.\d+)?[fF.]?(?=\s|$|;)
+        captures:
+          1:
+            name: keyword.operator.arithmetic.mlog
       - name: constant.numeric.decimal.mlog
-        match: (?<=\s|^|-)\.\d+(?=\s|$|;)
+        match: (?<=\s|^)([+-])?\.\d+[fF.]?(?=\s|$|;)
+        captures:
+          1:
+            name: keyword.operator.arithmetic.mlog
       - name: constant.numeric.decimal.mlog
-        match: (?<=\s|^|-)\d+(\.\d+)?[Ee][+-]?\d+(?=\s|$|;)
+        match: (?<=\s|^)([+-])?\d+[Ee][+-]?\d+[fF.]?(?=\s|$|;)
+        captures:
+          1:
+            name: keyword.operator.arithmetic.mlog
   semicolon:
     match: ;(.*)$
     captures:

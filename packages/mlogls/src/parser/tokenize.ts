@@ -151,7 +151,8 @@ export function tokenize(chars: string) {
         (content.length === 7 || content.length === 9))
     )
       return new ColorLiteralToken(start, end, content);
-    if (!isNaN(Number(content))) return new NumberToken(start, end, content);
+    const maybeNumber = parseNumber(content);
+    if (maybeNumber !== undefined) return new NumberToken(start, end, content);
     return new IdentifierToken(start, end, content);
   }
 
@@ -238,4 +239,34 @@ export function tokenize(chars: string) {
   }
 
   return { lines, diagnostics };
+}
+
+const binaryNumberRegex = /^[-+]?0b[01]+$/;
+const hexNumberRegex = /^[-+]?0x[0-9a-fA-F]+$/;
+const decimalNumberRegex = /^[+-]?(\.\d+|\d+(\.\d+)?|\d+[eE][+-]?\d+)[fF.]?$/;
+
+function parseNumber(content: string): number | undefined {
+  let sign = 1;
+  let start = 0;
+  if (content.startsWith("+")) {
+    start++;
+  } else if (content.startsWith("-")) {
+    sign = -1;
+    start++;
+  }
+
+  if (binaryNumberRegex.test(content)) {
+    return sign * parseInt(content.slice(start + 2), 2);
+  }
+
+  if (hexNumberRegex.test(content)) {
+    return sign * parseInt(content.slice(start + 2), 16);
+  }
+
+  if (decimalNumberRegex.test(content)) {
+    let end = content.length;
+    if (/[fF.]$/.test(content)) end--;
+
+    return Number(content.slice(0, end));
+  }
 }
