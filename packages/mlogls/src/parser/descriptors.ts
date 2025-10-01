@@ -572,8 +572,7 @@ export function validateParameters(
 
         diagnostics.push({
           range: param.token,
-          message:
-            "This parameter is ignored by this instruction. Replace it with an underscore.",
+          message: `This parameter is ignored by this instruction. Replace it with ${ignoreToken}.`,
           severity: DiagnosticSeverity.Hint,
           code: DiagnosticCode.ignoredValue,
           tags: [DiagnosticTag.Unnecessary],
