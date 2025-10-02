@@ -1,7 +1,7 @@
 {
   "name": "mlogls-workspace",
   "private": true,
-  "packageManager": "pnpm@8.14.3",
+  "packageManager": "pnpm@10.15.1",
   "scripts": {
     "build:all": "pnpm -C packages/mlogls build && pnpm -C packages/mlogls-vscode build"
   },

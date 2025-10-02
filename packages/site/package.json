@@ -1,0 +1,37 @@
+{
+  "name": "docs",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "preview": "vitepress preview"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@babel/runtime": "^7.28.3",
+    "@codemirror/commands": "^6.8.1",
+    "@codemirror/language": "^6.11.0",
+    "@codemirror/lint": "^6.8.5",
+    "@codemirror/lsp-client": "^6.1.2",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.37.0",
+    "@lezer/generator": "^1.7.1",
+    "@lezer/highlight": "^1.2.1",
+    "@lezer/lr": "^1.4.2",
+    "@uiw/codemirror-theme-vscode": "^4.23.6",
+    "codemirror": "^6.0.1",
+    "fflate": "^0.8.2",
+    "mlogls": "workspace:^",
+    "vite": "^7.1.4",
+    "vitepress": "^1.4.0",
+    "vscode-languageclient": "^9.0.1",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-protocol": "^3.17.5",
+    "vue": "^3.5.21"
+  }
+}
