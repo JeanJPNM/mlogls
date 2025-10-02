@@ -21,9 +21,9 @@ yargs(hideBin(process.argv))
           default: false,
         })
         .option("socket", {
-          type: "boolean",
+          type: "number",
           desc: "The socket port to use for socket communication",
-          default: false,
+          demandOption: false,
         })
         .option("pipe", {
           type: "string",
