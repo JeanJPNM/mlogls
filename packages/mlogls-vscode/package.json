@@ -71,8 +71,8 @@
     "url": "https://github.com/JeanJPNM/mlogls/issues"
   },
   "devDependencies": {
-    "@types/vscode": "^1.75.0",
-    "chokidar": "^3.6.0",
+    "@types/vscode": "^1.104.0",
+    "chokidar": "^4.0.3",
     "js-yaml": "^4.1.0",
     "mlogls": "workspace:^",
     "vscode-languageclient": "^9.0.1",

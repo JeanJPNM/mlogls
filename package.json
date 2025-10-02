@@ -6,14 +6,14 @@
     "build:all": "pnpm -C packages/mlogls build && pnpm -C packages/mlogls-vscode build"
   },
   "devDependencies": {
-    "@eslint/js": "^9.8.0",
+    "@eslint/js": "^9.36.0",
     "@types/node": "^20.5.7",
-    "esbuild": "^0.23.0",
-    "eslint": "^9.8.0",
-    "eslint-config-prettier": "^9.1.0",
-    "prettier": "3.3.3",
-    "prettier-plugin-jsdoc": "1.3.0",
-    "typescript": "^5.5.3",
-    "typescript-eslint": "^7.17.0"
+    "esbuild": "^0.25.10",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "3.6.2",
+    "prettier-plugin-jsdoc": "1.3.3",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.45.0"
   }
 }
