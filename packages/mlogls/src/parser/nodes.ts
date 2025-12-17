@@ -2322,7 +2322,7 @@ export class SetMarkerInstruction extends InstructionNode<
       textAlign: { id: {}, alignment: {} },
       lineAlign: { id: {}, alignment: {} },
       labelFlags: { id: {}, background: {}, outline: {} },
-      texture: { id: {}, name: {} },
+      texture: { id: {}, fromTextBuffer: {}, textureName: {} },
       textureSize: { id: {}, width: {}, height: {} },
       posi: { id: {}, index: {}, x: {}, y: {} },
       uvi: { id: {}, index: {}, x: {}, y: {} },
@@ -2334,6 +2334,23 @@ export class SetMarkerInstruction extends InstructionNode<
     const data = SetMarkerInstruction.descriptor.parse(line.tokens);
 
     return new SetMarkerInstruction(line, ...data);
+  }
+
+  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
+    let localDiagnostics: ParserDiagnostic[] = [];
+    super.provideDiagnostics(doc, localDiagnostics);
+
+    // don't emit an incompleteInstruction warning when fromTextBuffer is truthy
+    if (this.data.$type === "texture") {
+      const fromTextBuffer = this.data.fromTextBuffer?.content;
+      if (fromTextBuffer === "true" || fromTextBuffer === "1") {
+        localDiagnostics = localDiagnostics.filter((diagnostic) => {
+          return diagnostic.code !== DiagnosticCode.incompleteInstruction;
+        });
+      }
+    }
+
+    diagnostics.push(...localDiagnostics);
   }
 }
 
