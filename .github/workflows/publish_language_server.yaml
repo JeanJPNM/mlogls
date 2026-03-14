@@ -7,8 +7,14 @@ on:
       - "mlogls-*"
       - "!mlogls-vscode-*"
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
+    environment:
+      name: language-server
     runs-on: ubuntu-latest
 
     steps:
@@ -20,10 +26,8 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           cache: pnpm
 
-      - run: pnpm install
+      - run: pnpm install --frozen-lockfile
       - run: pnpm -C packages/mlogls build
       - run: |
           cd packages/mlogls
           pnpm publish --no-git-checks
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
