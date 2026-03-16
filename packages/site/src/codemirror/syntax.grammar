@@ -70,15 +70,17 @@ Boolean {
   NumberLiteral,
   Color
 }
+
+instructionSeparator { "\n" | ";" }
 @tokens {
-  instructionSeparator { "\n" | ";" }
+  ";"
   whitespace { @whitespace }
   Comment { "#" ![\n]* }
   identifier { ![ \t\n\r#;"] ![ \t\n\r#;]* }
   maybeLabelName { ![ \t\n\r#;"] ![ \t\n\r#;]* ":" }
 
   @precedence {
-    instructionSeparator,
+    "\n",
     whitespace,
     Comment,
     maybeLabelName,
