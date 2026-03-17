@@ -1,4 +1,4 @@
-import { Diagnostic, Range } from "vscode-languageserver";
+import { Diagnostic, DiagnosticSeverity, Range } from "vscode-languageserver";
 import { DiagnosticCode } from "../protocol";
 import {
   ColorLiteralToken,
@@ -65,19 +65,6 @@ export function tokenize(chars: string) {
         statement();
     }
   }
-
-  //load destination indices
-  // for (var i of jumps) {
-  //   const content = i.location?.content;
-  //   if (!jumpLocations.has(i.location?.content)) {
-  //     emitError(
-  //       'Undefined jump location: "' +
-  //         i.location +
-  //         '". Make sure the jump label exists and is typed correctly.'
-  //     );
-  //   }
-  //   i.jump.dest = jumpLocations.get(i.location?.content) ?? -1;
-  // }
 
   function getCurrentLocation(): ParserPosition {
     return new ParserPosition(line, pos - lineStart);
@@ -151,7 +138,7 @@ export function tokenize(chars: string) {
         (content.length === 7 || content.length === 9))
     )
       return new ColorLiteralToken(start, end, content);
-    const maybeNumber = parseNumber(content);
+    const maybeNumber = parseNumber(content, start, diagnostics);
     if (maybeNumber !== undefined) return new NumberToken(start, end, content);
     return new IdentifierToken(start, end, content);
   }
@@ -245,7 +232,11 @@ const binaryNumberRegex = /^[-+]?0b[01]+$/;
 const hexNumberRegex = /^[-+]?0x[0-9a-fA-F]+$/;
 const decimalNumberRegex = /^[+-]?(\.\d+|\d+(\.\d+)?|\d+[eE][+-]?\d+)[fF.]?$/;
 
-function parseNumber(content: string): number | undefined {
+function parseNumber(
+  content: string,
+  position: ParserPosition,
+  diagnostics: ParserDiagnostic[]
+): number | undefined {
   let sign = 1;
   let start = 0;
   if (content.startsWith("+")) {
@@ -267,6 +258,140 @@ function parseNumber(content: string): number | undefined {
     let end = content.length;
     if (/[fF.]$/.test(content)) end--;
 
+    validateDecimalNumber(content, start, end, position, diagnostics);
+
     return Number(content.slice(0, end));
+  }
+}
+
+const maxLongValue = 1n << 63n;
+const maxLongValueLength = maxLongValue.toString().length;
+
+function validateDecimalNumber(
+  content: string,
+  start: number,
+  end: number,
+  position: ParserPosition,
+  diagnostics: ParserDiagnostic[]
+): void {
+  let dot = -1;
+  let e = -1;
+
+  for (let i = start; i < end; i++) {
+    if (content[i] === ".") {
+      dot = i;
+    } else if (content[i] === "e" || content[i] === "E") {
+      e = i;
+    }
+  }
+
+  if (dot !== -1) {
+    validateDecimalComponent(
+      content,
+      start,
+      dot,
+      position,
+      diagnostics,
+      "The integer part of the number"
+    );
+
+    validateDecimalComponent(
+      content,
+      dot + 1,
+      end,
+      position,
+      diagnostics,
+      "The fractional part of the number"
+    );
+  } else if (e !== -1) {
+    validateDecimalComponent(
+      content,
+      start,
+      e,
+      position,
+      diagnostics,
+      "The significand of the number"
+    );
+
+    validateDecimalComponent(
+      content,
+      e + 1,
+      end,
+      position,
+      diagnostics,
+      "The exponent of the number"
+    );
+  } else {
+    validateDecimalComponent(
+      content,
+      start,
+      end,
+      position,
+      diagnostics,
+      "The number"
+    );
+  }
+}
+
+/**
+ * Checks if the decimal component of a number can be parsed by the game's mlog
+ * parser, which uses its own implementation instead of relying on java's
+ * built-in parsing. This is necessary to prevent the parser from accepting
+ * numbers that would be rejected by the game, which would cause discrepancies
+ * between the editor and the game.
+ */
+function isValidDecimalNumber(
+  content: string,
+  start: number,
+  end: number,
+  positive: boolean
+): boolean {
+  const length = end - start;
+
+  // avoid creating bigints in cases where its clear
+  // whether or not the number is in range just by looking at its length
+  if (length < maxLongValueLength) return true;
+  if (length > maxLongValueLength) return false;
+
+  const decimalPart = content.slice(start, end);
+  const value = BigInt(decimalPart);
+
+  return positive ? value < maxLongValue : value <= maxLongValue;
+}
+
+function validateDecimalComponent(
+  content: string,
+  start: number,
+  end: number,
+  position: ParserPosition,
+  diagnostics: ParserDiagnostic[],
+  prefix: string
+): void {
+  if (start === end) return;
+  let positive = true;
+  let parseStart = start;
+  if (content[start] === "+" || content[start] === "-") {
+    parseStart++;
+    positive = content[start] === "+";
+  }
+
+  if (!isValidDecimalNumber(content, parseStart, end, positive)) {
+    const message = `${prefix} will not be parsed correctly by the game because it is out of range.`;
+
+    diagnostics.push({
+      range: Range.create(
+        {
+          line: position.line,
+          character: position.character + start,
+        },
+        {
+          line: position.line,
+          character: position.character + end,
+        }
+      ),
+      message,
+      code: DiagnosticCode.outOfRangeValue,
+      severity: DiagnosticSeverity.Error,
+    });
   }
 }
