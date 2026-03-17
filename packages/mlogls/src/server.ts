@@ -1005,20 +1005,34 @@ export function startServer(options: LanguageServerOptions) {
     const parserDiagnostics: ParserDiagnostic[] = [...doc.parserDiagnostics];
 
     let instructionCount = 0;
+    let tooManyInstructionsRange: Range | undefined;
+
     for (const node of doc.nodes) {
       node.provideDiagnostics(doc, parserDiagnostics);
       if (node instanceof InstructionNode) {
         instructionCount++;
 
         if (instructionCount > maxInstructionCount) {
-          parserDiagnostics.push({
-            range: node,
-            message: `Exceeded maximum instruction count of ${maxInstructionCount}`,
-            severity: DiagnosticSeverity.Error,
-            code: DiagnosticCode.tooManyInstructions,
-          });
+          if (tooManyInstructionsRange === undefined) {
+            tooManyInstructionsRange = {
+              start: { line: node.start.line, character: node.start.character },
+              end: { line: node.end.line, character: node.end.character },
+            };
+          } else {
+            tooManyInstructionsRange.end.line = node.end.line;
+            tooManyInstructionsRange.end.character = node.end.character;
+          }
         }
       }
+    }
+
+    if (tooManyInstructionsRange) {
+      parserDiagnostics.push({
+        range: tooManyInstructionsRange,
+        message: `Exceeded maximum instruction count of ${maxInstructionCount}`,
+        severity: DiagnosticSeverity.Error,
+        code: DiagnosticCode.tooManyInstructions,
+      });
     }
 
     validateLabelUsage(doc, parserDiagnostics);
