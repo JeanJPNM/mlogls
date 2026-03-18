@@ -55,7 +55,7 @@ importers:
   packages/mlogls-vscode:
     devDependencies:
       '@types/vscode':
-        specifier: ^1.104.0
+        specifier: ^1.75.0
         version: 1.104.0
       chokidar:
         specifier: ^4.0.3
