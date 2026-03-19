@@ -1318,6 +1318,7 @@ export class UnitControlInstruction extends InstructionNode<
       mine: { x: {}, y: {} },
       flag: { value: {} },
       build: { x: {}, y: {}, block: {}, rotation: {}, config: {} },
+      deconstruct: { x: {}, y: {} },
       getBlock: {
         x: {},
         y: {},
