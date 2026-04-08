@@ -26,6 +26,7 @@ import {
   CommandHandlerMap,
   createCommandAction,
   DiagnosticCode,
+  ignorableDiagnosticCodes,
   TokenModifiers,
   TokenTypes,
 } from "./protocol";
@@ -34,7 +35,6 @@ import {
   maxInstructionCount,
   stringTemplatePattern,
 } from "./constants";
-import { ParserDiagnostic } from "./parser/tokenize";
 import { formatCode } from "./formatter";
 import {
   CommentLine,
@@ -53,6 +53,7 @@ import {
   findLabelsInScope,
   findVariableUsageLocations,
   findVariableWriteLocations,
+  getDiagnosingContext,
   getLabelBlocks,
   LabelBlock,
   labelDeclarationNameRange,
@@ -62,6 +63,12 @@ import {
 } from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
 import { findRange, findRangeIndex } from "./util/range_search";
+import {
+  commentLineDiagnosticDirectiveKinds,
+  CommentToken,
+  diagnosticDirectiveKinds,
+  trailingCommentDiagnosticDirectiveKinds,
+} from "./parser/tokens";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -400,7 +407,10 @@ export function startServer(options: LanguageServerOptions) {
     // show completions for instructions if:
     // - no token line is selected
     // - the cursor is contained within the first token of the selected token line
-    if (!line || selectedToken === line.tokens[0]) {
+    if (
+      !line ||
+      (selectedToken === line.tokens[0] && !selectedToken.isComment())
+    ) {
       return {
         items: getInstructionNames().map((code) => ({
           label: code,
@@ -464,6 +474,60 @@ export function startServer(options: LanguageServerOptions) {
           kind: CompletionItemKind.Color,
         });
       }
+
+      return completions;
+    }
+
+    // suggest diagnostic directive kinds if the comment
+    // is a potentially incomplete diagnostic directive
+    if (
+      selectedToken?.isComment() &&
+      shouldSuggestDiagnosticKinds(selectedToken, position)
+    ) {
+      const kinds =
+        node instanceof CommentLine
+          ? commentLineDiagnosticDirectiveKinds
+          : trailingCommentDiagnosticDirectiveKinds;
+
+      return kinds.map<CompletionItem>((kind) => ({
+        label: kind,
+        kind: CompletionItemKind.Keyword,
+        insertText: kind,
+        detail: "Diagnostic directive",
+      }));
+    }
+
+    if (selectedToken?.isComment() && selectedToken.diagnosticDirective) {
+      const offset = position.character - selectedToken.start.character;
+
+      // make sure we don't recommend rule names inside the directive prefix
+      if (offset < selectedToken.diagnosticDirective.prefixEnd) return;
+      // don't show completions in the description section of the comment
+      if (offset > selectedToken.diagnosticDirective.itemsEnd) return;
+
+      const items = selectedToken.diagnosticDirective.items;
+
+      const completions = CompletionList.create();
+      for (const item of items) {
+        if (item.start > offset || item.end < offset) continue;
+
+        completions.itemDefaults = {
+          editRange: Range.create(
+            selectedToken.start.line,
+            selectedToken.start.character + item.start,
+            selectedToken.start.line,
+            selectedToken.start.character + item.end
+          ),
+        };
+        break;
+      }
+
+      completions.items = ignorableDiagnosticCodes
+        .filter((code) => items.every((item) => item.code !== code))
+        .map<CompletionItem>((code) => ({
+          label: code,
+          kind: CompletionItemKind.Value,
+        }));
 
       return completions;
     }
@@ -998,17 +1062,18 @@ export function startServer(options: LanguageServerOptions) {
   });
 
   documents.onDidChangeContent(async (change) => {
-    // TODO: add diagnostics for unused variables (script-wide)
     const doc = documents.get(change.document.uri);
     if (!doc) return;
 
-    const parserDiagnostics: ParserDiagnostic[] = [...doc.parserDiagnostics];
+    const context = getDiagnosingContext(doc);
 
     let instructionCount = 0;
     let tooManyInstructionsRange: Range | undefined;
 
-    for (const node of doc.nodes) {
-      node.provideDiagnostics(doc, parserDiagnostics);
+    for (let i = 0; i < doc.nodes.length; i++) {
+      const node = doc.nodes[i];
+      node.provideDiagnostics(doc, context, i);
+
       if (node instanceof InstructionNode) {
         instructionCount++;
 
@@ -1027,7 +1092,7 @@ export function startServer(options: LanguageServerOptions) {
     }
 
     if (tooManyInstructionsRange) {
-      parserDiagnostics.push({
+      context.addDiagnostic(doc.nodes.length - 1, {
         range: tooManyInstructionsRange,
         message: `Exceeded maximum instruction count of ${maxInstructionCount}`,
         severity: DiagnosticSeverity.Error,
@@ -1035,12 +1100,13 @@ export function startServer(options: LanguageServerOptions) {
       });
     }
 
-    validateLabelUsage(doc, parserDiagnostics);
-    validateVariableUsage(doc, parserDiagnostics);
+    validateLabelUsage(doc, context);
+    validateVariableUsage(doc, context);
+    context.reportUnusedItems(doc.nodes);
 
     const diagnostics: Diagnostic[] = [];
 
-    for (const diagnostic of parserDiagnostics) {
+    for (const diagnostic of context.diagnostics) {
       diagnostics.push({
         ...diagnostic,
         source: "mlog",
@@ -1096,4 +1162,36 @@ function containsPosition(range: Range, position: Position) {
     range.start.character <= position.character &&
     position.character <= range.end.character
   );
+}
+
+function shouldSuggestDiagnosticKinds(token: CommentToken, position: Position) {
+  const content = token.content;
+  const offset = position.character - token.start.character;
+
+  // skip leading #
+  let start = 1;
+  while (
+    start < content.length &&
+    (content[start] === " " || content[start] === "\t")
+  ) {
+    start++;
+  }
+
+  // suggest directive kinds on empty comments
+  if (start >= content.length) return true;
+
+  let end = start;
+  while (
+    end < content.length &&
+    content[end] !== " " &&
+    content[end] !== "\t"
+  ) {
+    end++;
+  }
+
+  if (offset > end) return false;
+
+  const prefix = content.slice(start, end);
+
+  return diagnosticDirectiveKinds.some((kind) => kind.startsWith(prefix));
 }

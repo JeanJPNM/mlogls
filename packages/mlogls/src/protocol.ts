@@ -75,6 +75,31 @@ export enum DiagnosticCode {
   preferJumpLabels = "prefer-jump-labels",
   incompleteInstruction = "incomplete-instruction",
   labelWithoutInstruction = "label-without-instruction",
+  unnecessaryDiagnosticDirective = "unnecessary-diagnostic-directive",
+  invalidDiagnosticDirective = "invalid-diagnostic-directive",
+}
+
+export const diagnosticCodes = Object.values(DiagnosticCode);
+
+// parser errors can't be disabled by diagnostic directives
+export const ignorableDiagnosticCodes = diagnosticCodes.filter(
+  (code) =>
+    code !== DiagnosticCode.lineTooLong &&
+    code !== DiagnosticCode.unexpectedToken &&
+    code !== DiagnosticCode.missingSpace &&
+    code !== DiagnosticCode.unclosedString
+);
+
+const ignorableDiagnosticCodesSet = new Set(ignorableDiagnosticCodes);
+
+export function isDiagnosticCode(code: string): code is DiagnosticCode {
+  return diagnosticCodes.includes(code as never);
+}
+
+export function isIgnorableDiagnosticCode(
+  code: string
+): code is DiagnosticCode {
+  return ignorableDiagnosticCodesSet.has(code as never);
 }
 
 export enum CommandCode {

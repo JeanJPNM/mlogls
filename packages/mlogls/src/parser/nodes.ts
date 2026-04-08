@@ -40,8 +40,14 @@ import {
   TokenSemanticData,
 } from "../analysis";
 import { MlogDocument } from "../document";
-import { ParserPosition, TextToken } from "./tokens";
+import {
+  CommentToken,
+  DiagnosticDirective,
+  ParserPosition,
+  TextToken,
+} from "./tokens";
 import { getSpellingSuggestionForName } from "../util/spelling";
+import { DiagnosingContext } from "../diagnosing_context";
 
 export abstract class SyntaxNode {
   start: ParserPosition;
@@ -52,12 +58,23 @@ export abstract class SyntaxNode {
     this.end = line.end;
   }
 
-  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
+  get trailingComment(): CommentToken | undefined {
+    const { tokens } = this.line;
+    const lastToken = tokens[tokens.length - 1];
+
+    if (lastToken.isComment()) return lastToken;
+  }
+
+  provideDiagnostics(
+    doc: MlogDocument,
+    context: DiagnosingContext,
+    nodeIndex: number
+  ): void {
     // TODO: makes more sense to move this to the parser
     const tokens = this.line.tokens;
 
     if (tokens.length > 16) {
-      diagnostics.push({
+      context.addDiagnostic(nodeIndex, {
         range: Range.create(tokens[16].start, tokens[tokens.length - 1].end),
         message: "Line too long; may only contain 16 tokens",
         severity: DiagnosticSeverity.Error,
@@ -86,7 +103,7 @@ export abstract class SyntaxNode {
             message += `. Did you mean '${suggestion}'?`;
           }
 
-          diagnostics.push({
+          context.addDiagnostic(nodeIndex, {
             message,
             range: Range.create(
               token.start.line,
@@ -114,7 +131,7 @@ export abstract class SyntaxNode {
           message += `. Did you mean '${suggestion}'?`;
         }
 
-        diagnostics.push({
+        context.addDiagnostic(nodeIndex, {
           message,
           range: Range.create(
             token.start.line,
@@ -194,6 +211,10 @@ export class CommentLine extends SyntaxNode {
     super(line);
   }
 
+  get diagnosticDirective(): DiagnosticDirective | undefined {
+    return this.trailingComment?.diagnosticDirective;
+  }
+
   provideSignatureHelp(): SignatureHelp {
     return { signatures: [] };
   }
@@ -217,8 +238,12 @@ export class LabelDeclaration extends SyntaxNode {
     this.name = line.tokens[0].content.slice(0, -1);
   }
 
-  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(doc, diagnostics);
+  provideDiagnostics(
+    doc: MlogDocument,
+    context: DiagnosingContext,
+    nodeIndex: number
+  ): void {
+    super.provideDiagnostics(doc, context, nodeIndex);
 
     const { tokens } = this.line;
 
@@ -232,7 +257,7 @@ export class LabelDeclaration extends SyntaxNode {
     const first = tokens[1];
     const last = tokens[tokenCount - 1];
 
-    diagnostics.push({
+    context.addDiagnostic(nodeIndex, {
       range: Range.create(first.start, last.end),
       message: "Unexpected token after label declaration",
       severity: DiagnosticSeverity.Error,
@@ -292,14 +317,19 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     return this.descriptor.getCompletionItems(this.data, context, targetToken);
   }
 
-  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(doc, diagnostics);
+  provideDiagnostics(
+    doc: MlogDocument,
+    context: DiagnosingContext,
+    nodeIndex: number
+  ): void {
+    super.provideDiagnostics(doc, context, nodeIndex);
     this.descriptor.provideDiagnostics(
       doc.symbolTable,
       this.data,
       this.line.tokens,
       this.parameters,
-      diagnostics
+      context,
+      nodeIndex
     );
   }
 
@@ -455,8 +485,12 @@ export class UnknownInstruction extends InstructionNode<
     };
   }
 
-  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(doc, diagnostics);
+  provideDiagnostics(
+    doc: MlogDocument,
+    context: DiagnosingContext,
+    nodeIndex: number
+  ): void {
+    super.provideDiagnostics(doc, context, nodeIndex);
 
     const [name] = this.line.tokens;
     let message = `Unknown instruction: ${name.content}`;
@@ -468,7 +502,7 @@ export class UnknownInstruction extends InstructionNode<
     if (suggestion) {
       message += `. Did you mean '${suggestion}'?`;
     }
-    diagnostics.push({
+    context.addDiagnostic(nodeIndex, {
       message,
       range: name,
       severity: DiagnosticSeverity.Warning,
@@ -1041,8 +1075,12 @@ export class PackColorInstruction extends InstructionNode<
     return new PackColorInstruction(line, ...data);
   }
 
-  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
-    super.provideDiagnostics(doc, diagnostics);
+  provideDiagnostics(
+    doc: MlogDocument,
+    context: DiagnosingContext,
+    nodeIndex: number
+  ): void {
+    super.provideDiagnostics(doc, context, nodeIndex);
 
     const { red, green, blue, alpha } = this.data;
 
@@ -1052,7 +1090,7 @@ export class PackColorInstruction extends InstructionNode<
       const { value } = token;
 
       if (value < 0 || value > 1) {
-        diagnostics.push({
+        context.addDiagnostic(nodeIndex, {
           range: token,
           message: "packcolor parameters must be within the range: [0, 1]",
           severity: DiagnosticSeverity.Warning,
@@ -1065,7 +1103,7 @@ export class PackColorInstruction extends InstructionNode<
         token.content.indexOf(".") !== -1 &&
         token.content.split(".")[1].length > 3
       ) {
-        diagnostics.push({
+        context.addDiagnostic(nodeIndex, {
           range: token,
           message:
             "Only 3 decimal digits are necessary for packcolor parameters.",
@@ -2337,21 +2375,28 @@ export class SetMarkerInstruction extends InstructionNode<
     return new SetMarkerInstruction(line, ...data);
   }
 
-  provideDiagnostics(doc: MlogDocument, diagnostics: ParserDiagnostic[]): void {
-    let localDiagnostics: ParserDiagnostic[] = [];
-    super.provideDiagnostics(doc, localDiagnostics);
+  provideDiagnostics(
+    doc: MlogDocument,
+    context: DiagnosingContext,
+    nodeIndex: number
+  ): void {
+    let suppressIncompleteInstruction = false;
 
     // don't emit an incompleteInstruction warning when fromTextBuffer is truthy
     if (this.data.$type === "texture") {
       const fromTextBuffer = this.data.fromTextBuffer?.content;
       if (fromTextBuffer === "true" || fromTextBuffer === "1") {
-        localDiagnostics = localDiagnostics.filter((diagnostic) => {
-          return diagnostic.code !== DiagnosticCode.incompleteInstruction;
-        });
+        suppressIncompleteInstruction = true;
       }
     }
 
-    diagnostics.push(...localDiagnostics);
+    if (suppressIncompleteInstruction) {
+      context.disable(DiagnosticCode.incompleteInstruction);
+    }
+    super.provideDiagnostics(doc, context, nodeIndex);
+    if (suppressIncompleteInstruction) {
+      context.enable(DiagnosticCode.incompleteInstruction);
+    }
   }
 }
 

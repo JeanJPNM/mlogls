@@ -3,6 +3,7 @@ import {
   Command,
   CompletionItem,
   CompletionItemKind,
+  Diagnostic,
   DiagnosticSeverity,
   DiagnosticTag,
   Hover,
@@ -11,7 +12,6 @@ import {
   ParameterInformation,
   SignatureInformation,
 } from "vscode-languageserver";
-import { ParserDiagnostic } from "./tokenize";
 import {
   createSpellingAction,
   DiagnosticCode,
@@ -24,6 +24,7 @@ import { SymbolTable } from "../symbol";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { MlogDocument } from "../document";
 import { ignoreToken } from "../constants";
+import { DiagnosingContext } from "../diagnosing_context";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -96,11 +97,12 @@ export interface InstructionDescriptor<Data> {
     data: Data,
     tokens: TextToken[],
     parameters: InstructionParameter[],
-    diagnostics: ParserDiagnostic[]
+    context: DiagnosingContext,
+    nodeIndex: number
   ): void;
   provideCodeActions(
     doc: MlogDocument,
-    diagnostic: ParserDiagnostic,
+    diagnostic: Diagnostic,
     data: Data,
     tokens: TextToken[],
     actions: (CodeAction | Command)[]
@@ -151,9 +153,9 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       return [getDescriptorSignature(descriptor, name)];
     },
 
-    provideDiagnostics(table, data, tokens, parameters, diagnostics) {
-      validateMembers(descriptor, data, tokens, diagnostics);
-      validateParameters(table, parameters, diagnostics);
+    provideDiagnostics(table, data, tokens, parameters, context, nodeIndex) {
+      validateMembers(descriptor, data, tokens, context, nodeIndex);
+      validateParameters(table, parameters, context, nodeIndex);
     },
     provideCodeActions(doc, diagnostic, data, tokens, actions) {
       if (diagnostic.code !== DiagnosticCode.unknownVariant) return;
@@ -345,7 +347,7 @@ export function createOverloadDescriptor<
 
       return context.getVariableCompletions();
     },
-    provideDiagnostics(table, data, tokens, parameters, diagnostics) {
+    provideDiagnostics(table, data, tokens, parameters, context, nodeIndex) {
       if (data.$type === "unknown" && data.typeToken) {
         let message = `Unknown ${name} type: ${data.typeToken.content}`;
 
@@ -356,7 +358,7 @@ export function createOverloadDescriptor<
 
         if (suggestion) message += `. Did you mean '${suggestion}'?`;
 
-        diagnostics.push({
+        context.addDiagnostic(nodeIndex, {
           range: data.typeToken,
           message,
           severity: DiagnosticSeverity.Error,
@@ -371,10 +373,11 @@ export function createOverloadDescriptor<
           descriptor,
           data as DescriptorData<typeof descriptor>,
           tokens,
-          diagnostics
+          context,
+          nodeIndex
         );
       } else {
-        diagnostics.push({
+        context.addDiagnostic(nodeIndex, {
           range: tokens[0],
           message: "Incomplete instruction",
           code: DiagnosticCode.incompleteInstruction,
@@ -382,7 +385,7 @@ export function createOverloadDescriptor<
         });
       }
 
-      validateParameters(table, parameters, diagnostics);
+      validateParameters(table, parameters, context, nodeIndex);
     },
     provideCodeActions(doc, diagnostic, data, tokens, actions) {
       if (diagnostic.code !== DiagnosticCode.unknownVariant) return;
@@ -523,7 +526,8 @@ export function validateMembers<T extends SingleDescriptor>(
   descriptor: T,
   data: DescriptorData<T>,
   tokens: TextToken[],
-  diagnostics: ParserDiagnostic[]
+  context: DiagnosingContext,
+  nodeIndex: number
 ) {
   const missing: string[] = [];
   for (const key in descriptor) {
@@ -540,14 +544,15 @@ export function validateMembers<T extends SingleDescriptor>(
       validateRestrictedToken(
         token,
         param.restrict.values,
-        diagnostics,
+        context,
+        nodeIndex,
         param.restrict.invalidPrefix
       );
     }
   }
 
   if (missing.length > 0) {
-    diagnostics.push({
+    context.addDiagnostic(nodeIndex, {
       message:
         missing.length === 1
           ? `Missing parameter: ${missing[0]}`
@@ -562,7 +567,8 @@ export function validateMembers<T extends SingleDescriptor>(
 export function validateParameters(
   table: SymbolTable,
   parameters: InstructionParameter[],
-  diagnostics: ParserDiagnostic[]
+  diagnostics: DiagnosingContext,
+  nodeIndex: number
 ) {
   for (const param of parameters) {
     switch (param.usage) {
@@ -570,7 +576,7 @@ export function validateParameters(
         if (param.type === ParameterType.enumMember) break;
         if (param.token.content === ignoreToken) break;
 
-        diagnostics.push({
+        diagnostics.addDiagnostic(nodeIndex, {
           range: param.token,
           message: `This parameter is ignored by this instruction. Replace it with ${ignoreToken}.`,
           severity: DiagnosticSeverity.Hint,
@@ -580,7 +586,7 @@ export function validateParameters(
         break;
       case ParameterUsage.unused:
         if (param.token.content === ignoreToken) break;
-        diagnostics.push({
+        diagnostics.addDiagnostic(nodeIndex, {
           range: param.token,
           message: "Unused parameter",
           severity: DiagnosticSeverity.Hint,
@@ -593,7 +599,7 @@ export function validateParameters(
         if (param.token.content === ignoreToken) break;
 
         if (!param.token.isIdentifier()) {
-          diagnostics.push({
+          diagnostics.addDiagnostic(nodeIndex, {
             range: param.token,
             message: "Cannot use a literal value as an output parameter",
             code: DiagnosticCode.writingToReadOnly,
@@ -606,14 +612,14 @@ export function validateParameters(
         if (!symbol) break;
 
         if (symbol.isKeyword) {
-          diagnostics.push({
+          diagnostics.addDiagnostic(nodeIndex, {
             range: param.token,
             message: "Cannot use a keyword as an output parameter",
             code: DiagnosticCode.writingToReadOnly,
             severity: DiagnosticSeverity.Error,
           });
         } else if (!symbol.isWriteable) {
-          diagnostics.push({
+          diagnostics.addDiagnostic(nodeIndex, {
             range: param.token,
             message: "Cannot write to a read-only variable",
             code: DiagnosticCode.writingToReadOnly,
@@ -714,7 +720,8 @@ function overloadCompletionItems<const T extends Record<string, unknown>>(
 export function validateRestrictedToken(
   token: TextToken | undefined,
   values: readonly string[],
-  diagnostics: ParserDiagnostic[],
+  context: DiagnosingContext,
+  nodeIndex: number,
   message: string
 ) {
   if (!token) return;
@@ -726,7 +733,7 @@ export function validateRestrictedToken(
 
   if (suggestion) finalMessage += `. Did you mean '${suggestion}'?`;
 
-  diagnostics.push({
+  context.addDiagnostic(nodeIndex, {
     range: token,
     message: finalMessage,
     severity: DiagnosticSeverity.Warning,

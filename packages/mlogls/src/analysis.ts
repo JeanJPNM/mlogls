@@ -12,13 +12,23 @@ import {
   LabelDeclaration,
   SyntaxNode,
 } from "./parser/nodes";
-import { ParserDiagnostic } from "./parser/tokenize";
 import { MlogDocument } from "./document";
 import { DiagnosticCode } from "./protocol";
 import { buildingLinkNames, ignoreToken, maxLabelCount } from "./constants";
-import { ParserPosition, TextToken } from "./parser/tokens";
+import {
+  DiagnosticDirective,
+  DiagnosticDirectiveItem,
+  DiagnosticDirectiveScope,
+  ParserPosition,
+  TextToken,
+} from "./parser/tokens";
 import { NameSymbol, SymbolFlags, SymbolTable } from "./symbol";
 import { getSpellingSuggestionForName } from "./util/spelling";
+import {
+  DiagnosingContext,
+  DiagnosticSuppressionInfo,
+} from "./diagnosing_context";
+import { ParserDiagnostic } from "./parser/tokenize";
 
 export interface TokenSemanticData {
   token: TextToken;
@@ -222,13 +232,13 @@ export function labelDeclarationNameRange(textToken: TextToken) {
 
 export function validateLabelUsage(
   doc: MlogDocument,
-  diagnostics: ParserDiagnostic[]
+  context: DiagnosingContext
 ) {
   let instructionCount = 0;
   let labelCount = 0;
   const nodes = doc.nodes;
   const labels = new Map<string, LabelDeclaration>();
-  const unusedLabels = new Set<string>();
+  const unusedLabels = new Map<string, number>();
 
   for (const node of nodes) {
     if (node instanceof InstructionNode) {
@@ -237,7 +247,8 @@ export function validateLabelUsage(
   }
 
   let labelAddress = 0;
-  for (const node of nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
     if (node instanceof InstructionNode) {
       labelAddress++;
     }
@@ -245,7 +256,7 @@ export function validateLabelUsage(
     labelCount++;
 
     if (labelCount > maxLabelCount) {
-      diagnostics.push({
+      context.addDiagnostic(i, {
         range: node.nameToken,
         message: `Exceeded maximum label count of ${maxLabelCount}`,
         severity: DiagnosticSeverity.Error,
@@ -254,7 +265,7 @@ export function validateLabelUsage(
     }
 
     if (labelAddress === instructionCount) {
-      diagnostics.push({
+      context.addDiagnostic(i, {
         range: node.nameToken,
         message: `The label '${node.name}' does not precede any instruction`,
         severity: DiagnosticSeverity.Warning,
@@ -264,13 +275,13 @@ export function validateLabelUsage(
 
     if (!labels.has(node.name)) {
       labels.set(node.name, node);
-      unusedLabels.add(node.name);
+      unusedLabels.set(node.name, i);
       continue;
     }
 
     const original = labels.get(node.name)!;
 
-    diagnostics.push({
+    context.addDiagnostic(i, {
       range: node.nameToken,
       message: `Redeclaration of label '${node.name}'`,
       severity: DiagnosticSeverity.Error,
@@ -287,13 +298,14 @@ export function validateLabelUsage(
     });
   }
 
-  for (const node of nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
     if (!(node instanceof JumpInstruction)) continue;
     const { destination } = node.data;
     if (!destination) continue;
 
     if (destination.isNumber()) {
-      diagnostics.push({
+      context.addDiagnostic(i, {
         range: destination,
         message: "Prefer using labels instead of jump addresses",
         severity: DiagnosticSeverity.Hint,
@@ -302,7 +314,7 @@ export function validateLabelUsage(
 
       const address = destination.value;
       if (address < 0 || address >= instructionCount) {
-        diagnostics.push({
+        context.addDiagnostic(i, {
           range: destination,
           message: `Jump address '${address}' is out of range`,
           severity: DiagnosticSeverity.Error,
@@ -324,7 +336,7 @@ export function validateLabelUsage(
     if (suggestion) message += `. Did you mean '${suggestion}'?`;
 
     if (!labels.has(label)) {
-      diagnostics.push({
+      context.addDiagnostic(i, {
         range: destination,
         message,
         severity: DiagnosticSeverity.Error,
@@ -333,10 +345,10 @@ export function validateLabelUsage(
     }
   }
 
-  for (const label of unusedLabels) {
+  for (const [label, index] of unusedLabels) {
     const node = labels.get(label)!;
 
-    diagnostics.push({
+    context.addDiagnostic(index, {
       range: node.nameToken,
       message: `Label '${label}' is declared but never used`,
       severity: DiagnosticSeverity.Warning,
@@ -360,10 +372,7 @@ export function getLabelBlocks(nodes: SyntaxNode[]) {
    * where the ; separator is used to put multiple instructions on the same text
    * line
    */
-  let lineStart: ParserPosition = {
-    line: -1,
-    character: 0,
-  };
+  let lineStart = new ParserPosition(-1, 0);
 
   let current = root;
   const parents: LabelBlock[] = [];
@@ -472,7 +481,7 @@ export function isBuildingLink(name: string) {
 
 export function validateVariableUsage(
   doc: MlogDocument,
-  diagnostics: ParserDiagnostic[]
+  context: DiagnosingContext
 ) {
   const { symbolTable, nodes } = doc;
 
@@ -484,7 +493,8 @@ export function validateVariableUsage(
     unusedVariables.add(symbol.name);
   }
 
-  for (const node of nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
     if (!(node instanceof InstructionNode)) continue;
 
     for (const param of node.parameters) {
@@ -509,7 +519,7 @@ export function validateVariableUsage(
 
       if (suggestion) message += `. Did you mean '${suggestion}'?`;
 
-      diagnostics.push({
+      context.addDiagnostic(i, {
         range: param.token,
         message,
         severity: DiagnosticSeverity.Warning,
@@ -518,7 +528,9 @@ export function validateVariableUsage(
     }
   }
 
-  for (const node of nodes) {
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+
     if (!(node instanceof InstructionNode)) continue;
 
     for (const param of node.parameters) {
@@ -531,7 +543,7 @@ export function validateVariableUsage(
       if (param.token.content === ignoreToken) continue;
       if (!unusedVariables.has(param.token.content)) continue;
 
-      diagnostics.push({
+      context.addDiagnostic(i, {
         range: param.token,
         message: `Variable '${param.token.content}' is declared but never used`,
         severity: DiagnosticSeverity.Warning,
@@ -540,4 +552,301 @@ export function validateVariableUsage(
       });
     }
   }
+}
+
+type IndexedDiagnostic = [index: number, diagnostic: ParserDiagnostic];
+
+function getDiagnosticSuppressionMapping(
+  uri: string,
+  nodes: SyntaxNode[],
+  root: LabelBlock
+): [DiagnosticSuppressionInfo[], IndexedDiagnostic[]] {
+  const diagnostics: IndexedDiagnostic[] = [];
+
+  const rootInfo: DiagnosticSuppressionInfo = {
+    disabledCodes: new Map(),
+  };
+
+  const suppressionMapping = new Array(nodes.length).fill(rootInfo);
+
+  traverse(root, rootInfo);
+
+  function traverse(
+    block: LabelBlock,
+    parent: DiagnosticSuppressionInfo
+  ): void {
+    if (block.start === block.end) return;
+
+    const start = block.start;
+    const end = block.children[0]?.start ?? block.end;
+
+    let currentInfo: DiagnosticSuppressionInfo = {
+      disabledCodes: new Map(parent.disabledCodes),
+    };
+
+    /**
+     * Keeps track of whether we are still inside the range of a previously
+     * found next-line directive, so that we can correctly inherit its
+     * suppression rules. This is needed to handle cases where a next-line
+     * directive is followed by another directive on the next line.
+     */
+    let previousNextLineInfo: DiagnosticSuppressionInfo | null = null;
+
+    for (let i = start; i < end; i++) {
+      const node = nodes[i];
+      if (!previousNextLineInfo) {
+        suppressionMapping[i] = currentInfo;
+      }
+      const parentInfo = previousNextLineInfo ?? currentInfo;
+      previousNextLineInfo = null;
+
+      if (node instanceof CommentLine) {
+        const directive = node.diagnosticDirective;
+        if (!directive) continue;
+        switch (directive.scope) {
+          case DiagnosticDirectiveScope.currentLine:
+            diagnostics.push([
+              i,
+              {
+                range: node,
+                code: DiagnosticCode.invalidDiagnosticDirective,
+                message:
+                  "This kind of diagnostic directive must be placed at the end of a line of code, not on a separate line.",
+                severity: DiagnosticSeverity.Error,
+              },
+            ]);
+            break;
+          case DiagnosticDirectiveScope.nextLine: {
+            // find all lines that are affected by this directive
+            let j = i + 1;
+            while (
+              j < nodes.length &&
+              nodes[j].start.line === node.start.line + 1
+            ) {
+              j++;
+            }
+
+            if (j === i + 1) {
+              diagnostics.push([
+                i,
+                {
+                  range: node,
+                  code: DiagnosticCode.invalidDiagnosticDirective,
+                  message:
+                    "Diagnostic directives that apply to the next line must be placed directly before a line of code.",
+                  severity: DiagnosticSeverity.Error,
+                },
+              ]);
+              break;
+            }
+
+            const innerInfo: DiagnosticSuppressionInfo = {
+              disabledCodes: new Map(parentInfo.disabledCodes),
+            };
+
+            handleDirectiveItems(directive, innerInfo, i);
+            for (let k = i + 1; k < j; k++) {
+              suppressionMapping[k] = innerInfo;
+            }
+
+            // only the last syntax node covered by this directive can
+            // have a comment with another directive, so we can skip to it directly
+            // we also set preserveInfo to avoid the automatic override that happens
+            // at the start of each iteration
+            i = j - 2;
+            previousNextLineInfo = innerInfo;
+
+            break;
+          }
+          case DiagnosticDirectiveScope.scope:
+            currentInfo = {
+              disabledCodes: new Map(parentInfo.disabledCodes),
+            };
+
+            handleDirectiveItems(directive, currentInfo, i);
+        }
+      } else if (node instanceof InstructionNode) {
+        const comment = node.trailingComment;
+        const directive = comment?.diagnosticDirective;
+        if (!directive) continue;
+
+        switch (directive.scope) {
+          case DiagnosticDirectiveScope.currentLine: {
+            const innerInfo: DiagnosticSuppressionInfo = {
+              disabledCodes: new Map(parentInfo.disabledCodes),
+            };
+            handleDirectiveItems(directive, innerInfo, i);
+            suppressionMapping[i] = innerInfo;
+
+            break;
+          }
+          case DiagnosticDirectiveScope.nextLine:
+            diagnostics.push([
+              i,
+              {
+                range: Range.create(comment.start, comment.end),
+                code: DiagnosticCode.invalidDiagnosticDirective,
+                message:
+                  "Diagnostic directives that apply to the next line must be placed directly before a line of code, not at the end of a line.",
+                severity: DiagnosticSeverity.Error,
+              },
+            ]);
+            break;
+          case DiagnosticDirectiveScope.scope:
+            diagnostics.push([
+              i,
+              {
+                range: Range.create(comment.start, comment.end),
+                code: DiagnosticCode.invalidDiagnosticDirective,
+                message:
+                  "This kind of diagnostic directive cannot be used at the end of a line of code. It must be placed on a separate line before the code it applies to.",
+                severity: DiagnosticSeverity.Error,
+              },
+            ]);
+        }
+      }
+    }
+
+    for (const child of block.children) {
+      traverse(child, currentInfo);
+    }
+  }
+
+  function handleDirectiveItems(
+    directive: DiagnosticDirective,
+    region: DiagnosticSuppressionInfo,
+    nodeIndex: number
+  ) {
+    if (directive.items.length === 0) {
+      const node = nodes[nodeIndex];
+      const comment = node.trailingComment!;
+
+      diagnostics.push([
+        nodeIndex,
+        {
+          message:
+            "Diagnostic directives must specify at least one diagnostic code.",
+          range: Range.create(comment.start, comment.end),
+          code: DiagnosticCode.invalidDiagnosticDirective,
+          severity: DiagnosticSeverity.Error,
+        },
+      ]);
+      return;
+    }
+
+    for (const item of directive.items) {
+      if (!item.code) {
+        diagnostics.push([
+          nodeIndex,
+          {
+            message: item.codeExists
+              ? "This diagnostic code cannot be disabled."
+              : "Invalid diagnostic code.",
+            range: Range.create(item.startPosition, item.endPosition),
+            code: DiagnosticCode.invalidDiagnosticDirective,
+            severity: DiagnosticSeverity.Error,
+          },
+        ]);
+        continue;
+      }
+      if (directive.isDisable && region.disabledCodes.has(item.code)) {
+        const existingItem = region.disabledCodes.get(item.code)!;
+        diagnostics.push([
+          nodeIndex,
+          {
+            message: `Diagnostic code '${item.code}' is already disabled.`,
+            range: Range.create(item.startPosition, item.endPosition),
+            code: DiagnosticCode.unnecessaryDiagnosticDirective,
+            severity: DiagnosticSeverity.Error,
+            relatedInformation: [
+              {
+                message: "The diagnostic code is already disabled here",
+                location: {
+                  uri,
+                  range: Range.create(
+                    existingItem.startPosition,
+                    existingItem.endPosition
+                  ),
+                },
+              },
+            ],
+          },
+        ]);
+        continue;
+      }
+
+      if (!directive.isDisable && !region.disabledCodes.has(item.code)) {
+        const existingItem = region.disabledCodes.get(item.code)!;
+        diagnostics.push([
+          nodeIndex,
+          {
+            message: `Diagnostic code '${item.code}' is already enabled.`,
+            range: Range.create(item.startPosition, item.endPosition),
+            code: DiagnosticCode.unnecessaryDiagnosticDirective,
+            severity: DiagnosticSeverity.Error,
+            relatedInformation: [
+              {
+                message: "The diagnostic code is already enabled here",
+                location: {
+                  uri,
+                  range: Range.create(
+                    existingItem.startPosition,
+                    existingItem.endPosition
+                  ),
+                },
+              },
+            ],
+          },
+        ]);
+        continue;
+      }
+
+      if (directive.isDisable) {
+        region.disabledCodes.set(item.code, item);
+      } else {
+        region.disabledCodes.delete(item.code);
+      }
+    }
+  }
+
+  return [suppressionMapping, diagnostics];
+}
+
+export function getDiagnosingContext(doc: MlogDocument): DiagnosingContext {
+  const root = getLabelBlocks(doc.nodes);
+  const [suppressionMapping, indexedDiagnostics] =
+    getDiagnosticSuppressionMapping(doc.uri, doc.nodes, root);
+  const directiveItems = new Set<DiagnosticDirectiveItem>();
+
+  for (const node of doc.nodes) {
+    if (node instanceof CommentLine) {
+      const directive = node.diagnosticDirective;
+      if (!directive) continue;
+
+      for (const item of directive.items) {
+        if (!item.code) continue;
+        directiveItems.add(item);
+      }
+    } else if (node instanceof InstructionNode) {
+      const directive = node.trailingComment?.diagnosticDirective;
+      if (!directive) continue;
+
+      for (const item of directive.items) {
+        if (!item.code) continue;
+        directiveItems.add(item);
+      }
+    }
+  }
+
+  const context = new DiagnosingContext(
+    [...doc.parserDiagnostics],
+    suppressionMapping,
+    directiveItems
+  );
+
+  for (const [index, diagnostic] of indexedDiagnostics) {
+    context.addDiagnostic(index, diagnostic);
+  }
+
+  return context;
 }
