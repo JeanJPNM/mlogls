@@ -561,7 +561,11 @@ function getDiagnosticSuppressionMapping(
   uri: string,
   nodes: SyntaxNode[],
   root: LabelBlock
-): [DiagnosticSuppressionInfo[], IndexedDiagnostic[]] {
+): [
+  DiagnosticSuppressionInfo[],
+  IndexedDiagnostic[],
+  Set<DiagnosticDirectiveItem>,
+] {
   const diagnostics: IndexedDiagnostic[] = [];
 
   const rootInfo: DiagnosticSuppressionInfo = {
@@ -570,6 +574,7 @@ function getDiagnosticSuppressionMapping(
   };
 
   const suppressionMapping = new Array(nodes.length).fill(rootInfo);
+  const redudantItems = new Set<DiagnosticDirectiveItem>();
 
   traverse(root, rootInfo, true);
 
@@ -581,21 +586,19 @@ function getDiagnosticSuppressionMapping(
     if (block.start === block.end) return;
     // skip the label of the block, as directives on it are handled by the parent block
     let start = block.start + (isRoot ? 0 : 1);
-    let end = start;
-    let currentInfo = handleNodes(parent, start, end);
+    let currentInfo = parent;
 
     for (const child of block.children) {
       // handle directives before and between the children
-      start = end;
       // include the child's label in the range of the parent block,
       // so that -next-line directives on the label are handled correctly
-      end = child.start + 1;
-      currentInfo = handleNodes(currentInfo, start, end);
+      currentInfo = handleNodes(currentInfo, start, child.start + 1);
+      start = child.end;
       traverse(child, currentInfo);
     }
 
     // handle directives after the children
-    handleNodes(currentInfo, end, block.end);
+    handleNodes(currentInfo, start, block.end);
   }
 
   function handleNodes(
@@ -777,6 +780,8 @@ function getDiagnosticSuppressionMapping(
         continue;
       }
       if (directive.isDisable && region.disabledCodes.has(item.code)) {
+        redudantItems.add(item);
+
         const existingItem = region.disabledCodes.get(item.code)!;
         diagnostics.push([
           nodeIndex,
@@ -803,6 +808,8 @@ function getDiagnosticSuppressionMapping(
       }
 
       if (!directive.isDisable && !region.disabledCodes.has(item.code)) {
+        redudantItems.add(item);
+
         // the rule may be enabled by a diagnostic item
         // or it might just be enabled by default
         const existingItem = region.enabledCodes.get(item.code);
@@ -843,14 +850,14 @@ function getDiagnosticSuppressionMapping(
     }
   }
 
-  return [suppressionMapping, diagnostics];
+  return [suppressionMapping, diagnostics, redudantItems];
 }
 
 export function getDiagnosingContext(doc: MlogDocument): DiagnosingContext {
   const root = getLabelBlocks(doc.nodes);
-  const [suppressionMapping, indexedDiagnostics] =
+  const [suppressionMapping, indexedDiagnostics, redundantItems] =
     getDiagnosticSuppressionMapping(doc.uri, doc.nodes, root);
-  const directiveItems = new Set<DiagnosticDirectiveItem>();
+  const potentiallyUnusedItems = new Set<DiagnosticDirectiveItem>();
 
   for (const node of doc.nodes) {
     const comment = node.trailingComment;
@@ -863,14 +870,15 @@ export function getDiagnosingContext(doc: MlogDocument): DiagnosingContext {
 
     for (const item of directive.items) {
       if (!item.code) continue;
-      directiveItems.add(item);
+      if (redundantItems.has(item)) continue;
+      potentiallyUnusedItems.add(item);
     }
   }
 
   const context = new DiagnosingContext(
     [...doc.parserDiagnostics],
     suppressionMapping,
-    directiveItems
+    potentiallyUnusedItems
   );
 
   for (const [index, diagnostic] of indexedDiagnostics) {
