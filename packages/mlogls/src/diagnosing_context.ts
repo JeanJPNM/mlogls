@@ -6,10 +6,16 @@ import { SyntaxNode } from "./parser/nodes";
 
 export interface DiagnosticSuppressionInfo {
   /**
-   * A map of disabled diagnostic codes and the index of the comment line that
-   * disabled them.
+   * A map of disabled diagnostic codes and diagnostic directive items that
+   * disable them.
    */
   readonly disabledCodes: Map<DiagnosticCode, DiagnosticDirectiveItem>;
+  /**
+   * A map of manually enabled diagnostic codes and diagnostic directive items
+   * that enable them. Used only to report diagnostic directive items that have
+   * no effect.
+   */
+  readonly enabledCodes: Map<DiagnosticCode, DiagnosticDirectiveItem>;
 }
 
 export class DiagnosingContext {

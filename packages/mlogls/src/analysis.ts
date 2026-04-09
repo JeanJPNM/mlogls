@@ -1,5 +1,6 @@
 import {
   CompletionItem,
+  DiagnosticRelatedInformation,
   DiagnosticSeverity,
   DiagnosticTag,
   Range,
@@ -565,23 +566,48 @@ function getDiagnosticSuppressionMapping(
 
   const rootInfo: DiagnosticSuppressionInfo = {
     disabledCodes: new Map(),
+    enabledCodes: new Map(),
   };
 
   const suppressionMapping = new Array(nodes.length).fill(rootInfo);
 
-  traverse(root, rootInfo);
+  traverse(root, rootInfo, true);
 
   function traverse(
     block: LabelBlock,
-    parent: DiagnosticSuppressionInfo
+    parent: DiagnosticSuppressionInfo,
+    isRoot = false
   ): void {
     if (block.start === block.end) return;
+    // skip the label of the block, as directives on it are handled by the parent block
+    let start = block.start + (isRoot ? 0 : 1);
+    let end = start;
+    let currentInfo = handleNodes(parent, start, end);
 
-    const start = block.start;
-    const end = block.children[0]?.start ?? block.end;
+    for (const child of block.children) {
+      // handle directives before and between the children
+      start = end;
+      // include the child's label in the range of the parent block,
+      // so that -next-line directives on the label are handled correctly
+      end = child.start + 1;
+      currentInfo = handleNodes(currentInfo, start, end);
+      traverse(child, currentInfo);
+    }
+
+    // handle directives after the children
+    handleNodes(currentInfo, end, block.end);
+  }
+
+  function handleNodes(
+    parent: DiagnosticSuppressionInfo,
+    start: number,
+    end: number
+  ): DiagnosticSuppressionInfo {
+    if (start === end) return parent;
 
     let currentInfo: DiagnosticSuppressionInfo = {
       disabledCodes: new Map(parent.disabledCodes),
+      enabledCodes: new Map(parent.enabledCodes),
     };
 
     /**
@@ -642,6 +668,7 @@ function getDiagnosticSuppressionMapping(
 
             const innerInfo: DiagnosticSuppressionInfo = {
               disabledCodes: new Map(parentInfo.disabledCodes),
+              enabledCodes: new Map(parentInfo.enabledCodes),
             };
 
             handleDirectiveItems(directive, innerInfo, i);
@@ -661,11 +688,12 @@ function getDiagnosticSuppressionMapping(
           case DiagnosticDirectiveScope.scope:
             currentInfo = {
               disabledCodes: new Map(parentInfo.disabledCodes),
+              enabledCodes: new Map(parentInfo.enabledCodes),
             };
 
             handleDirectiveItems(directive, currentInfo, i);
         }
-      } else if (node instanceof InstructionNode) {
+      } else {
         const comment = node.trailingComment;
         const directive = comment?.diagnosticDirective;
         if (!directive) continue;
@@ -674,6 +702,7 @@ function getDiagnosticSuppressionMapping(
           case DiagnosticDirectiveScope.currentLine: {
             const innerInfo: DiagnosticSuppressionInfo = {
               disabledCodes: new Map(parentInfo.disabledCodes),
+              enabledCodes: new Map(parentInfo.enabledCodes),
             };
             handleDirectiveItems(directive, innerInfo, i);
             suppressionMapping[i] = innerInfo;
@@ -707,9 +736,7 @@ function getDiagnosticSuppressionMapping(
       }
     }
 
-    for (const child of block.children) {
-      traverse(child, currentInfo);
-    }
+    return currentInfo;
   }
 
   function handleDirectiveItems(
@@ -776,7 +803,23 @@ function getDiagnosticSuppressionMapping(
       }
 
       if (!directive.isDisable && !region.disabledCodes.has(item.code)) {
-        const existingItem = region.disabledCodes.get(item.code)!;
+        // the rule may be enabled by a diagnostic item
+        // or it might just be enabled by default
+        const existingItem = region.enabledCodes.get(item.code);
+        const relatedInformation: DiagnosticRelatedInformation[] = [];
+        if (existingItem) {
+          relatedInformation.push({
+            message: "The diagnostic code is already enabled here",
+            location: {
+              uri,
+              range: Range.create(
+                existingItem.startPosition,
+                existingItem.endPosition
+              ),
+            },
+          });
+        }
+
         diagnostics.push([
           nodeIndex,
           {
@@ -784,18 +827,7 @@ function getDiagnosticSuppressionMapping(
             range: Range.create(item.startPosition, item.endPosition),
             code: DiagnosticCode.unnecessaryDiagnosticDirective,
             severity: DiagnosticSeverity.Error,
-            relatedInformation: [
-              {
-                message: "The diagnostic code is already enabled here",
-                location: {
-                  uri,
-                  range: Range.create(
-                    existingItem.startPosition,
-                    existingItem.endPosition
-                  ),
-                },
-              },
-            ],
+            relatedInformation,
           },
         ]);
         continue;
@@ -803,8 +835,10 @@ function getDiagnosticSuppressionMapping(
 
       if (directive.isDisable) {
         region.disabledCodes.set(item.code, item);
+        region.enabledCodes.delete(item.code);
       } else {
         region.disabledCodes.delete(item.code);
+        region.enabledCodes.set(item.code, item);
       }
     }
   }
@@ -819,22 +853,17 @@ export function getDiagnosingContext(doc: MlogDocument): DiagnosingContext {
   const directiveItems = new Set<DiagnosticDirectiveItem>();
 
   for (const node of doc.nodes) {
-    if (node instanceof CommentLine) {
-      const directive = node.diagnosticDirective;
-      if (!directive) continue;
+    const comment = node.trailingComment;
+    const directive = comment?.diagnosticDirective;
 
-      for (const item of directive.items) {
-        if (!item.code) continue;
-        directiveItems.add(item);
-      }
-    } else if (node instanceof InstructionNode) {
-      const directive = node.trailingComment?.diagnosticDirective;
-      if (!directive) continue;
+    // only directives that disable diagnostic codes are relevant
+    // since enabling directives only generates a warning when the codes
+    // already enabled
+    if (!directive || !directive.isDisable) continue;
 
-      for (const item of directive.items) {
-        if (!item.code) continue;
-        directiveItems.add(item);
-      }
+    for (const item of directive.items) {
+      if (!item.code) continue;
+      directiveItems.add(item);
     }
   }
 
