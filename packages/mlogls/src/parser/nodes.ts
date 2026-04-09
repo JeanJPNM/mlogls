@@ -10,7 +10,7 @@ import {
   SignatureHelp,
   TextEdit,
 } from "vscode-languageserver";
-import { ParserDiagnostic, TokenLine } from "./tokenize";
+import { TokenLine } from "./tokenize";
 import {
   CommandCode,
   createCommandAction,
