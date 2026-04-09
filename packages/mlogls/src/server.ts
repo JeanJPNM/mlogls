@@ -27,6 +27,7 @@ import {
   createCommandAction,
   DiagnosticCode,
   ignorableDiagnosticCodes,
+  isDiagnosticCode,
   TokenModifiers,
   TokenTypes,
 } from "./protocol";
@@ -67,6 +68,7 @@ import {
   commentLineDiagnosticDirectiveKinds,
   CommentToken,
   diagnosticDirectiveKinds,
+  DiagnosticDirectiveScope,
   trailingCommentDiagnosticDirectiveKinds,
 } from "./parser/tokens";
 
@@ -189,6 +191,134 @@ export function startServer(options: LanguageServerOptions) {
         const start = firstIgnored.token.start;
         const end = node.parameters[node.parameters.length - 1].token.end;
         edits.push(TextEdit.del(Range.create(start, end)));
+      }
+
+      await connection.workspace.applyEdit({
+        changes: {
+          [doc.uri]: edits,
+        },
+      });
+    },
+    async [CommandCode.disableDiagnosticForLine](textDocument, position, code) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+
+      const index = getSelectedSyntaxNodeIndex(doc, position);
+      if (index === -1) return;
+      const node = doc.nodes[index];
+      const previous = doc.nodes[index - 1];
+
+      const edits: TextEdit[] = [];
+      if (
+        previous instanceof CommentLine &&
+        previous.start.line === node.start.line - 1 &&
+        previous.diagnosticDirective?.scope ===
+          DiagnosticDirectiveScope.nextLine
+      ) {
+        const directive = previous.diagnosticDirective;
+        const insertPosition =
+          directive.items.length > 0
+            ? directive.items[directive.items.length - 1].endPosition
+            : Position.create(
+                previous.start.line,
+                previous.start.character + directive.prefixEnd
+              );
+
+        edits.push(TextEdit.insert(insertPosition, ` ${code}`));
+      } else {
+        const lineStart = Position.create(position.line, 0);
+        const indentation = doc.getText({
+          start: lineStart,
+          end: node.start,
+        });
+        edits.push(
+          TextEdit.insert(
+            lineStart,
+            `${indentation}# mlogls-disable-next-line ${code}\n`
+          )
+        );
+      }
+
+      await connection.workspace.applyEdit({
+        changes: {
+          [doc.uri]: edits,
+        },
+      });
+    },
+    async [CommandCode.disableDiagnosticForFile](textDocument, code) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+      const first = doc.nodes[0];
+      const edits: TextEdit[] = [];
+      if (
+        first instanceof CommentLine &&
+        first.diagnosticDirective?.scope === DiagnosticDirectiveScope.scope
+      ) {
+        const directive = first.diagnosticDirective;
+        const insertPosition =
+          directive.items.length > 0
+            ? directive.items[directive.items.length - 1].endPosition
+            : Position.create(
+                first.start.line,
+                first.start.character + directive.prefixEnd
+              );
+        edits.push(TextEdit.insert(insertPosition, ` ${code}`));
+      } else {
+        edits.push(
+          TextEdit.insert(Position.create(0, 0), `# mlogls-disable ${code}\n`)
+        );
+      }
+
+      await connection.workspace.applyEdit({
+        changes: {
+          [doc.uri]: edits,
+        },
+      });
+    },
+
+    async [CommandCode.removeDiagnosticDirective](textDocument, position) {
+      const doc = documents.get(textDocument.uri);
+      if (!doc) return;
+
+      const index = getSelectedSyntaxNodeIndex(doc, position);
+      if (index === -1) return;
+      const node = doc.nodes[index];
+
+      const edits: TextEdit[] = [];
+
+      const directive = node.trailingComment?.diagnosticDirective;
+      if (!directive) return;
+
+      for (const item of directive.items) {
+        const offset = position.character - item.basePosition.character;
+
+        if (offset < item.start || offset >= item.end) continue;
+
+        let deleteStart: Position;
+        let deleteEnd: Position;
+
+        // delete the single item if there are more
+        // otherwise delete the entire comment
+        if (directive.items.length > 1) {
+          deleteStart = Position.create(
+            item.basePosition.line,
+            // include the space before the code
+            item.basePosition.character + item.start - 1
+          );
+          deleteEnd = Position.create(
+            item.basePosition.line,
+            item.basePosition.character + item.end
+          );
+        } else if (node instanceof CommentLine) {
+          deleteStart = Position.create(node.start.line, 0);
+          deleteEnd = Position.create(node.start.line + 1, 0);
+        } else {
+          const lastToken = node.line.tokens[node.line.tokens.length - 1];
+          deleteStart = lastToken.end;
+          deleteEnd = node.trailingComment.end;
+        }
+
+        edits.push(TextEdit.del(Range.create(deleteStart, deleteEnd)));
       }
 
       await connection.workspace.applyEdit({
@@ -612,11 +742,69 @@ export function startServer(options: LanguageServerOptions) {
 
     const actions: (CodeAction | Command)[] = [];
 
+    const codes = new Map<DiagnosticCode, Diagnostic[]>();
+
+    for (const diagnostic of params.context.diagnostics) {
+      if (!isDiagnosticCode(diagnostic.code)) continue;
+
+      if (!codes.has(diagnostic.code)) {
+        codes.set(diagnostic.code, []);
+      }
+
+      codes.get(diagnostic.code)!.push(diagnostic);
+    }
+
+    for (const diagnostic of params.context.diagnostics) {
+      if (
+        diagnostic.code === DiagnosticCode.unnecessaryDiagnosticDirective ||
+        diagnostic.code === DiagnosticCode.invalidDiagnosticDirective
+      ) {
+        const node = getSelectedSyntaxNode(doc, diagnostic.range.start);
+        if (!node?.trailingComment?.diagnosticDirective) continue;
+
+        for (const item of node.trailingComment.diagnosticDirective.items) {
+          const start = item.startPosition;
+          const end = item.endPosition;
+          if (
+            start.character === diagnostic.range.start.character &&
+            end.character === diagnostic.range.end.character
+          ) {
+            actions.push(
+              createCommandAction({
+                title: "Remove this diagnostic directive",
+                command: CommandCode.removeDiagnosticDirective,
+                arguments: [params.textDocument, diagnostic.range.start],
+                diagnostics: [diagnostic],
+                kind: CodeActionKind.QuickFix,
+              })
+            );
+          }
+        }
+      }
+    }
+
     for (const node of getPartiallySelectedSyntaxNodes(doc, start, end)) {
       for (const diagnostic of params.context.diagnostics) {
         if (!containsPosition(node, diagnostic.range.start)) continue;
 
         node.provideCodeActions(doc, diagnostic, actions);
+      }
+
+      for (const [code, diagnostics] of codes) {
+        const selected = diagnostics.filter((diagnostic) =>
+          containsPosition(node, diagnostic.range.start)
+        );
+        if (selected.length === 0) continue;
+
+        actions.push(
+          createCommandAction({
+            title: `Disable '${code}' diagnostic for this line`,
+            command: CommandCode.disableDiagnosticForLine,
+            arguments: [params.textDocument, node.start, code],
+            diagnostics: selected,
+            kind: CodeActionKind.QuickFix,
+          })
+        );
       }
 
       if (node instanceof JumpInstruction) {
@@ -656,6 +844,18 @@ export function startServer(options: LanguageServerOptions) {
           })
         );
       }
+    }
+
+    for (const [code, diagnostics] of codes) {
+      actions.push(
+        createCommandAction({
+          title: `Disable '${code}' diagnostic for this file`,
+          command: CommandCode.disableDiagnosticForFile,
+          arguments: [params.textDocument, code],
+          diagnostics,
+          kind: CodeActionKind.QuickFix,
+        })
+      );
     }
 
     if (hasLabelJump) {
@@ -723,6 +923,32 @@ export function startServer(options: LanguageServerOptions) {
         const [textDocument] = args;
         if (!TextDocumentIdentifier.is(textDocument)) return;
         await commands[command](textDocument);
+        break;
+      }
+      case CommandCode.disableDiagnosticForLine: {
+        const [textDocument, position, code] = args;
+        if (!TextDocumentIdentifier.is(textDocument)) return;
+        if (!Position.is(position)) return;
+        if (!isDiagnosticCode(code)) return;
+
+        await commands[command](textDocument, position, code);
+        break;
+      }
+      case CommandCode.disableDiagnosticForFile: {
+        const [textDocument, code] = args;
+        if (!TextDocumentIdentifier.is(textDocument)) return;
+        if (!isDiagnosticCode(code)) return;
+
+        await commands[command](textDocument, code);
+        break;
+      }
+      case CommandCode.removeDiagnosticDirective: {
+        const [textDocument, position] = args;
+
+        if (!TextDocumentIdentifier.is(textDocument)) return;
+        if (!Position.is(position)) return;
+
+        await commands[command](textDocument, position);
         break;
       }
     }

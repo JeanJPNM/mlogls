@@ -92,12 +92,12 @@ export const ignorableDiagnosticCodes = diagnosticCodes.filter(
 
 const ignorableDiagnosticCodesSet = new Set(ignorableDiagnosticCodes);
 
-export function isDiagnosticCode(code: string): code is DiagnosticCode {
+export function isDiagnosticCode(code: unknown): code is DiagnosticCode {
   return diagnosticCodes.includes(code as never);
 }
 
 export function isIgnorableDiagnosticCode(
-  code: string
+  code: unknown
 ): code is DiagnosticCode {
   return ignorableDiagnosticCodesSet.has(code as never);
 }
@@ -108,6 +108,9 @@ export enum CommandCode {
   convertToColorLiteral = "mlogls.convertToColorLiteral",
   convertToPackColor = "mlogls.convertToPackColor",
   removeAllUnusedParameters = "mlogls.removeAllUnusedParameters",
+  disableDiagnosticForLine = "mlogls.disableDiagnosticForLine",
+  disableDiagnosticForFile = "mlogls.disableDiagnosticForFile",
+  removeDiagnosticDirective = "mlogls.removeDiagnosticDirective",
 }
 
 export interface CommandHandlerMap {
@@ -128,6 +131,19 @@ export interface CommandHandlerMap {
   ): Promise<void>;
   [CommandCode.removeAllUnusedParameters](
     textDocument: TextDocumentIdentifier
+  ): Promise<void>;
+  [CommandCode.disableDiagnosticForLine](
+    textDocument: TextDocumentIdentifier,
+    position: Position,
+    code: string | number | undefined
+  ): Promise<void>;
+  [CommandCode.disableDiagnosticForFile](
+    textDocument: TextDocumentIdentifier,
+    code: string | number | undefined
+  ): Promise<void>;
+  [CommandCode.removeDiagnosticDirective](
+    textDocument: TextDocumentIdentifier,
+    position: Position
   ): Promise<void>;
 }
 
