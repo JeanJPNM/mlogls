@@ -58,6 +58,13 @@ You can suppress specific language server warnings and errors using special comm
    - Applies exclusively to the line it is placed on.
    - Must be placed at the end of an instruction line (as a trailing comment).
 
+After specifying the diagnostic codes, you may use `--` to write a short description or explanation for why a directive is being used.
+
+```mlog
+# mlogls-disable-next-line unused-variable -- This is an explanation
+set count 0
+```
+
 ### Scope Interaction
 
 Suppression rules defined by scope directives interact directly with the **Logical Label Scopes**:
