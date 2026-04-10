@@ -573,7 +573,9 @@ function getDiagnosticSuppressionMapping(
     enabledCodes: new Map(),
   };
 
-  const suppressionMapping = new Array(nodes.length).fill(rootInfo);
+  const suppressionMapping = new Array<DiagnosticSuppressionInfo>(
+    nodes.length
+  ).fill(rootInfo);
   const redudantItems = new Set<DiagnosticDirectiveItem>();
 
   traverse(root, rootInfo, true);

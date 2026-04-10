@@ -60,7 +60,7 @@ export class MlogDocument implements TextDocument {
     return (this.#symbolTable ??= getSymbolTable(this.nodes));
   }
 
-  getText(range?: Range | undefined): string {
+  getText(range?: Range): string {
     return this.#document.getText(range);
   }
   positionAt(offset: number): Position {
