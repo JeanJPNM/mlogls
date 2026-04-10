@@ -1,6 +1,8 @@
 import { lezer } from "@lezer/generator/rollup";
-import path from "path";
+import path from "node:path";
 import { defineConfig } from "vitepress";
+import fs from "node:fs/promises";
+import jsYaml from "js-yaml";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -13,6 +15,7 @@ export default defineConfig({
     nav: [
       { text: "Home", link: "/" },
       { text: "Usage", link: "/usage" },
+      { text: "Language Features", link: "/docs/language-features" },
       { text: "Playground", link: "/playground" },
       {
         text: "Other resources",
@@ -37,6 +40,21 @@ export default defineConfig({
     socialLinks: [
       { icon: "github", link: "https://github.com/JeanJPNM/mlogls" },
     ],
+  },
+  markdown: {
+    async shikiSetup(shiki) {
+      const grammarPath = path.resolve(
+        __dirname,
+        "../../mlogls-vscode/syntaxes/mlog.tmLanguage.yaml"
+      );
+      const grammar = await fs.readFile(grammarPath, "utf-8");
+      const json = jsYaml.load(grammar) as any;
+      await shiki.loadLanguage({
+        ...json,
+        name: "mlog",
+        displayName: "Mindustry Logic",
+      });
+    },
   },
   vite: {
     resolve: {
