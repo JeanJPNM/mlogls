@@ -1294,7 +1294,7 @@ export function startServer(options: LanguageServerOptions) {
     const context = getDiagnosingContext(doc);
 
     let instructionCount = 0;
-    let tooManyInstructionsRange: Range | undefined;
+    let tooManyInstructionsRange: { start: number; end: number } | undefined;
 
     for (let i = 0; i < doc.nodes.length; i++) {
       const node = doc.nodes[i];
@@ -1305,21 +1305,19 @@ export function startServer(options: LanguageServerOptions) {
 
         if (instructionCount > maxInstructionCount) {
           if (tooManyInstructionsRange === undefined) {
-            tooManyInstructionsRange = {
-              start: { line: node.start.line, character: node.start.character },
-              end: { line: node.end.line, character: node.end.character },
-            };
+            tooManyInstructionsRange = { start: i, end: i };
           } else {
-            tooManyInstructionsRange.end.line = node.end.line;
-            tooManyInstructionsRange.end.character = node.end.character;
+            tooManyInstructionsRange.end = i;
           }
         }
       }
     }
 
     if (tooManyInstructionsRange) {
-      context.addDiagnostic(doc.nodes.length - 1, {
-        range: tooManyInstructionsRange,
+      const { start, end } = tooManyInstructionsRange;
+
+      context.addDiagnostic(start, {
+        range: Range.create(doc.nodes[start].start, doc.nodes[end].end),
         message: `Exceeded maximum instruction count of ${maxInstructionCount}`,
         severity: DiagnosticSeverity.Error,
         code: DiagnosticCode.tooManyInstructions,
