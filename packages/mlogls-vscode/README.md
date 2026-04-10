@@ -4,6 +4,8 @@ Provides syntax highlighting and intellisense for mlog files in VS Code, using t
 
 ## Features
 
+For a more detailed explanation of the language server's features (such as logical label scopes and diagnostic suppression), visit the [documentation site](https://jeanjpnm.github.io/mlogls/).
+
 You can expect the following within mlog files:
 
 - Diagnostic messages

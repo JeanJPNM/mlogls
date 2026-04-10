@@ -9,6 +9,9 @@ hero:
     - theme: brand
       text: Get started
       link: /usage
+    - theme: alt
+      text: Language Features
+      link: /language-features
 
 features:
   - title: Intellisense

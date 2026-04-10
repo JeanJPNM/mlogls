@@ -13,9 +13,7 @@ export default defineConfig({
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
-      { text: "Home", link: "/" },
-      { text: "Usage", link: "/usage" },
-      { text: "Language Features", link: "/docs/language-features" },
+      { text: "Docs", link: "/docs/usage" },
       { text: "Playground", link: "/playground" },
       {
         text: "Other resources",
@@ -35,7 +33,12 @@ export default defineConfig({
         ],
       },
     ],
-    sidebar: {},
+    sidebar: {
+      "/docs/": [
+        { text: "Getting Started", link: "/docs/usage" },
+        { text: "Language Features", link: "/docs/language-features" },
+      ],
+    },
 
     socialLinks: [
       { icon: "github", link: "https://github.com/JeanJPNM/mlogls" },
