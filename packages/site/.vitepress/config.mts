@@ -51,7 +51,10 @@ export default defineConfig({
         "../../mlogls-vscode/syntaxes/mlog.tmLanguage.yaml"
       );
       const grammar = await fs.readFile(grammarPath, "utf-8");
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
       const json = jsYaml.load(grammar) as any;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       await shiki.loadLanguage({
         ...json,
         name: "mlog",
