@@ -776,6 +776,7 @@ export function startServer(options: LanguageServerOptions) {
                 arguments: [params.textDocument, diagnostic.range.start],
                 diagnostics: [diagnostic],
                 kind: CodeActionKind.QuickFix,
+                isPreferred: true,
               })
             );
           }
