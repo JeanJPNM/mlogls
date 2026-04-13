@@ -1,6 +1,8 @@
 import { lezer } from "@lezer/generator/rollup";
-import path from "path";
+import path from "node:path";
 import { defineConfig } from "vitepress";
+import fs from "node:fs/promises";
+import jsYaml from "js-yaml";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -11,8 +13,7 @@ export default defineConfig({
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     nav: [
-      { text: "Home", link: "/" },
-      { text: "Usage", link: "/usage" },
+      { text: "Docs", link: "/docs/usage" },
       { text: "Playground", link: "/playground" },
       {
         text: "Other resources",
@@ -32,11 +33,34 @@ export default defineConfig({
         ],
       },
     ],
-    sidebar: {},
+    sidebar: {
+      "/docs/": [
+        { text: "Getting Started", link: "/docs/usage" },
+        { text: "Language Features", link: "/docs/language-features" },
+      ],
+    },
 
     socialLinks: [
       { icon: "github", link: "https://github.com/JeanJPNM/mlogls" },
     ],
+  },
+  markdown: {
+    async shikiSetup(shiki) {
+      const grammarPath = path.resolve(
+        __dirname,
+        "../../mlogls-vscode/syntaxes/mlog.tmLanguage.yaml"
+      );
+      const grammar = await fs.readFile(grammarPath, "utf-8");
+
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+      const json = jsYaml.load(grammar) as any;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
+      await shiki.loadLanguage({
+        ...json,
+        name: "mlog",
+        displayName: "Mindustry Logic",
+      });
+    },
   },
   vite: {
     resolve: {

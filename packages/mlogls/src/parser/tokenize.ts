@@ -29,7 +29,9 @@ export class TokenLine {
 
 export type Lines = TokenLine[];
 
-export type ParserDiagnostic = Diagnostic;
+export type ParserDiagnostic = Diagnostic & {
+  code: DiagnosticCode;
+};
 
 const missingSpaceErrorMessage = "Expected space after string.";
 

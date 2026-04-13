@@ -75,6 +75,31 @@ export enum DiagnosticCode {
   preferJumpLabels = "prefer-jump-labels",
   incompleteInstruction = "incomplete-instruction",
   labelWithoutInstruction = "label-without-instruction",
+  unnecessaryDiagnosticDirective = "unnecessary-diagnostic-directive",
+  invalidDiagnosticDirective = "invalid-diagnostic-directive",
+}
+
+export const diagnosticCodes = Object.values(DiagnosticCode);
+
+// parser errors can't be disabled by diagnostic directives
+export const ignorableDiagnosticCodes = diagnosticCodes.filter(
+  (code) =>
+    code !== DiagnosticCode.lineTooLong &&
+    code !== DiagnosticCode.unexpectedToken &&
+    code !== DiagnosticCode.missingSpace &&
+    code !== DiagnosticCode.unclosedString
+);
+
+const ignorableDiagnosticCodesSet = new Set(ignorableDiagnosticCodes);
+
+export function isDiagnosticCode(code: unknown): code is DiagnosticCode {
+  return diagnosticCodes.includes(code as never);
+}
+
+export function isIgnorableDiagnosticCode(
+  code: unknown
+): code is DiagnosticCode {
+  return ignorableDiagnosticCodesSet.has(code as never);
 }
 
 export enum CommandCode {
@@ -83,6 +108,9 @@ export enum CommandCode {
   convertToColorLiteral = "mlogls.convertToColorLiteral",
   convertToPackColor = "mlogls.convertToPackColor",
   removeAllUnusedParameters = "mlogls.removeAllUnusedParameters",
+  disableDiagnosticForLine = "mlogls.disableDiagnosticForLine",
+  disableDiagnosticForFile = "mlogls.disableDiagnosticForFile",
+  removeDiagnosticDirective = "mlogls.removeDiagnosticDirective",
 }
 
 export interface CommandHandlerMap {
@@ -103,6 +131,19 @@ export interface CommandHandlerMap {
   ): Promise<void>;
   [CommandCode.removeAllUnusedParameters](
     textDocument: TextDocumentIdentifier
+  ): Promise<void>;
+  [CommandCode.disableDiagnosticForLine](
+    textDocument: TextDocumentIdentifier,
+    position: Position,
+    code: string | number | undefined
+  ): Promise<void>;
+  [CommandCode.disableDiagnosticForFile](
+    textDocument: TextDocumentIdentifier,
+    code: string | number | undefined
+  ): Promise<void>;
+  [CommandCode.removeDiagnosticDirective](
+    textDocument: TextDocumentIdentifier,
+    position: Position
   ): Promise<void>;
 }
 

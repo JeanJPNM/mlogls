@@ -1,5 +1,10 @@
 import { Color, Position } from "vscode-languageserver";
 import { colorData, isColorName } from "../constants";
+import {
+  DiagnosticCode,
+  isDiagnosticCode,
+  isIgnorableDiagnosticCode,
+} from "../protocol";
 
 export class ParserPosition implements Position {
   constructor(
@@ -28,7 +33,7 @@ export abstract class TextToken {
     return this instanceof IdentifierToken;
   }
 
-  isComment(): boolean {
+  isComment(): this is CommentToken {
     return this instanceof CommentToken;
   }
 
@@ -48,12 +53,189 @@ export class IdentifierToken extends TextToken {
 }
 
 export class CommentToken extends TextToken {
+  diagnosticDirective?: DiagnosticDirective;
+
   constructor(
     public start: ParserPosition,
     public end: ParserPosition,
     public content: string
   ) {
     super();
+    this.diagnosticDirective = DiagnosticDirective.tryParse(start, content);
+  }
+}
+
+export enum DiagnosticDirectiveMode {
+  enable,
+  disable,
+}
+
+export enum DiagnosticDirectiveScope {
+  currentLine,
+  nextLine,
+  scope,
+}
+
+const diagnosticDirectiveModeMap: Record<
+  string,
+  { mode: DiagnosticDirectiveMode; scope: DiagnosticDirectiveScope }
+> = {
+  "mlogls-disable-next-line": {
+    mode: DiagnosticDirectiveMode.disable,
+    scope: DiagnosticDirectiveScope.nextLine,
+  },
+  "mlogls-enable-next-line": {
+    mode: DiagnosticDirectiveMode.enable,
+    scope: DiagnosticDirectiveScope.nextLine,
+  },
+  "mlogls-disable-line": {
+    mode: DiagnosticDirectiveMode.disable,
+    scope: DiagnosticDirectiveScope.currentLine,
+  },
+  "mlogls-enable-line": {
+    mode: DiagnosticDirectiveMode.enable,
+    scope: DiagnosticDirectiveScope.currentLine,
+  },
+  "mlogls-disable": {
+    mode: DiagnosticDirectiveMode.disable,
+    scope: DiagnosticDirectiveScope.scope,
+  },
+  "mlogls-enable": {
+    mode: DiagnosticDirectiveMode.enable,
+    scope: DiagnosticDirectiveScope.scope,
+  },
+};
+
+export const diagnosticDirectiveKinds = Object.keys(diagnosticDirectiveModeMap);
+
+/** Diagnostic directive kinds that are valid on comment lines */
+export const commentLineDiagnosticDirectiveKinds =
+  diagnosticDirectiveKinds.filter((kind) => {
+    const scope = diagnosticDirectiveModeMap[kind].scope;
+    return (
+      scope === DiagnosticDirectiveScope.nextLine ||
+      scope === DiagnosticDirectiveScope.scope
+    );
+  });
+
+/** Diagnostic directive kinds that are valid on trailing comments */
+export const trailingCommentDiagnosticDirectiveKinds =
+  diagnosticDirectiveKinds.filter((kind) => {
+    const scope = diagnosticDirectiveModeMap[kind].scope;
+    return scope === DiagnosticDirectiveScope.currentLine;
+  });
+
+export class DiagnosticDirective {
+  constructor(
+    public mode: DiagnosticDirectiveMode,
+    public scope: DiagnosticDirectiveScope,
+    public basePosition: ParserPosition,
+    public prefixEnd: number,
+    public itemsEnd: number,
+    public items: DiagnosticDirectiveItem[]
+  ) {}
+
+  get isDisable() {
+    return this.mode === DiagnosticDirectiveMode.disable;
+  }
+
+  static readonly prefixRegex = /^#\s*(mlogls-[a-zA-Z-]*)/;
+
+  static tryParse(
+    basePosition: ParserPosition,
+    comment: string
+  ): DiagnosticDirective | undefined {
+    const match = comment.match(this.prefixRegex);
+    if (match?.index === undefined) return;
+    const prefix = match[0];
+    const rulesStart = match.index + prefix.length;
+
+    if (!(match[1] in diagnosticDirectiveModeMap)) return;
+    const { mode, scope } = diagnosticDirectiveModeMap[match[1]];
+
+    let start = -1;
+
+    const itemsStart = rulesStart;
+    let itemsEnd = comment.indexOf("--", itemsStart);
+    if (itemsEnd === -1) itemsEnd = comment.length;
+
+    const items: DiagnosticDirectiveItem[] = [];
+    for (let i = itemsStart; i < itemsEnd; i++) {
+      const c = comment[i];
+
+      if (c === " " || c === "\t") {
+        if (start !== -1) {
+          const name = comment.slice(start, i);
+          items.push(new DiagnosticDirectiveItem(basePosition, start, i, name));
+          start = -1;
+        }
+        continue;
+      }
+
+      if (start === -1) start = i;
+    }
+
+    if (start !== -1) {
+      items.push(
+        new DiagnosticDirectiveItem(
+          basePosition,
+          start,
+          itemsEnd,
+          comment.slice(start, itemsEnd)
+        )
+      );
+    }
+
+    return new DiagnosticDirective(
+      mode,
+      scope,
+      basePosition,
+      rulesStart,
+      itemsEnd,
+      items
+    );
+  }
+}
+export class DiagnosticDirectiveItem {
+  /**
+   * The diagnostic code, present only if the item's code exists and if it can
+   * be disabled.
+   */
+  code?: DiagnosticCode;
+  /**
+   * Whether the code is a valid diagnostic code. Regardless of whether it can
+   * be disabled.
+   */
+  codeExists: boolean;
+
+  constructor(
+    /**
+     * The start position of the comment containing this diagnostic directive
+     * item.
+     */
+    public basePosition: ParserPosition,
+    /** The start position of the rule name relative to the token's content. */
+    public start: number,
+    /** The end position of the rule name relative to the token's content. */
+    public end: number,
+    content: string
+  ) {
+    this.code = isIgnorableDiagnosticCode(content) ? content : undefined;
+    this.codeExists = isDiagnosticCode(content);
+  }
+
+  get startPosition(): ParserPosition {
+    return new ParserPosition(
+      this.basePosition.line,
+      this.basePosition.character + this.start
+    );
+  }
+
+  get endPosition(): ParserPosition {
+    return new ParserPosition(
+      this.basePosition.line,
+      this.basePosition.character + this.end
+    );
   }
 }
 
