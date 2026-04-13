@@ -1782,6 +1782,9 @@ export class SetRuleInstruction extends InstructionNode<
       canGameOver: {
         canIt: {},
       },
+      pauseDisabled: {
+        disabled: {},
+      },
       ambientLight: {
         color: {},
       },

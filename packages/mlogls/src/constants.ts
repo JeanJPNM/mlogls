@@ -313,6 +313,7 @@ const buildingBlockNames = [
   "large-logic-display",
   "tile-logic-display",
   "canvas",
+  "large-canvas",
   "reinforced-message",
   "world-processor",
   "world-cell",
