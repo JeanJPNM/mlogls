@@ -8,10 +8,10 @@ hero:
   actions:
     - theme: brand
       text: Get started
-      link: /usage
+      link: /docs/usage
     - theme: alt
       text: Language Features
-      link: /language-features
+      link: /docs/language-features
 
 features:
   - title: Intellisense
