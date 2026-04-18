@@ -1603,6 +1603,37 @@ export class SpawnUnitInstruction extends InstructionNode<
   }
 }
 
+export class SpawnBulletInstruction extends InstructionNode<
+  DataOf<typeof SpawnBulletInstruction>
+> {
+  descriptor = SpawnBulletInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "bullet",
+    descriptor: {
+      result: {},
+      from: {},
+      index: {},
+      x: {},
+      y: {},
+      rotation: {},
+      team: {},
+      owner: {},
+      damage: {},
+      velocityScale: {},
+      lifetimeScale: {},
+      aimX: {},
+      aimY: {},
+    },
+  });
+
+  static parse(this: void, line: TokenLine) {
+    const data = SpawnBulletInstruction.descriptor.parse(line.tokens);
+
+    return new SpawnBulletInstruction(line, ...data);
+  }
+}
+
 export class SenseWeatherInstruction extends InstructionNode<
   DataOf<typeof SenseWeatherInstruction>
 > {
@@ -2478,6 +2509,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   getblock: GetBlockInstruction.parse,
   setblock: SetBlockInstruction.parse,
   spawn: SpawnUnitInstruction.parse,
+  bullet: SpawnBulletInstruction.parse,
   weathersense: SenseWeatherInstruction.parse,
   weatherset: SetWeatherInstruction.parse,
   status: ApplyStatusInstruction.parse,
