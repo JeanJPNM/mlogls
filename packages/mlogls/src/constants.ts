@@ -673,6 +673,7 @@ export const sensors = [
   "@id",
   "@selectedBlock",
   "@selectedRotation",
+  "@lifetime",
   "@enabled",
   "@shoot",
   "@shootp",
