@@ -51,6 +51,8 @@ export const globalReadonlyVariables = [
   "@topRight",
   "@bottomLeft",
   "@bottomRight",
+
+  "@queries",
 ];
 
 const buildingBlockNames = [

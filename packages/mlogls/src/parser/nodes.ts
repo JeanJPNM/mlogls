@@ -2251,6 +2251,48 @@ export class FetchInstruction extends InstructionNode<
   }
 }
 
+export class QueryInstruction extends InstructionNode<
+  DataOf<typeof QueryInstruction>
+> {
+  descriptor = QueryInstruction.descriptor;
+
+  static readonly descriptor = createOverloadDescriptor({
+    name: "query",
+    overloads: {
+      circle: {
+        type: {
+          restrict: {
+            values: ["unit", "building"],
+            invalidPrefix: "Invalid query type: ",
+          },
+        },
+        team: {},
+        x: {},
+        y: {},
+        radius: {},
+      },
+      rect: {
+        type: {
+          restrict: {
+            values: ["unit", "building"],
+            invalidPrefix: "Invalid query type: ",
+          },
+        },
+        team: {},
+        x: {},
+        y: {},
+        width: {},
+        height: {},
+      },
+    },
+  });
+
+  static parse(this: void, line: TokenLine) {
+    const data = QueryInstruction.descriptor.parse(line.tokens);
+
+    return new QueryInstruction(line, ...data);
+  }
+}
 export class SyncInstruction extends InstructionNode<
   DataOf<typeof SyncInstruction>
 > {
@@ -2521,6 +2563,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   explosion: ExplosionInstruction.parse,
   setrate: SetRateInstruction.parse,
   fetch: FetchInstruction.parse,
+  query: QueryInstruction.parse,
   sync: SyncInstruction.parse,
   getflag: GetFlagInstruction.parse,
   setflag: SetFlagInstruction.parse,
