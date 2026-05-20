@@ -33,6 +33,7 @@ import {
 } from "./protocol";
 import {
   colorData,
+  ignoreToken,
   maxInstructionCount,
   stringTemplatePattern,
 } from "./constants";
@@ -183,14 +184,25 @@ export function startServer(options: LanguageServerOptions) {
       for (const node of nodes) {
         if (!(node instanceof InstructionNode)) continue;
 
-        const firstIgnored = node.parameters.find(
-          (param) => param.usage === ParameterUsage.unused
-        );
-        if (!firstIgnored) continue;
+        // will never be removed because it's the instruction name
+        let previousToken = node.line.tokens[0];
 
-        const start = firstIgnored.token.start;
-        const end = node.parameters[node.parameters.length - 1].token.end;
-        edits.push(TextEdit.del(Range.create(start, end)));
+        for (let i = 0; i < node.parameters.length; i++) {
+          const param = node.parameters[i];
+
+          if (
+            param.usage !== ParameterUsage.unused ||
+            param.token.content === ignoreToken
+          ) {
+            previousToken = param.token;
+            continue;
+          }
+
+          edits.push(
+            TextEdit.del(Range.create(previousToken.end, param.token.end))
+          );
+          previousToken = param.token;
+        }
       }
 
       await connection.workspace.applyEdit({
