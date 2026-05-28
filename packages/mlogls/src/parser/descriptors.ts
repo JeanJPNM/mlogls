@@ -116,7 +116,8 @@ export interface InstructionDescriptor<Data> {
   provideHover(
     data: Data,
     character: number,
-    tokens: TextToken[]
+    tokens: TextToken[],
+    extraBody?: string
   ): Hover | undefined;
 }
 
@@ -180,7 +181,7 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
-    provideHover(data, character, tokens) {
+    provideHover(data, character, tokens, extraBody) {
       const token = getTargetToken(character, tokens);
       if (!token) return;
 
@@ -188,7 +189,7 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       if (!name) return;
 
       return {
-        contents: createHoverString(`parameter <${name}>`),
+        contents: createHoverString(`parameter <${name}>`, extraBody),
         range: token,
       };
     },
@@ -422,7 +423,7 @@ export function createOverloadDescriptor<
       actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
-    provideHover(data, character, tokens) {
+    provideHover(data, character, tokens, extraBody) {
       const token = getTargetToken(character, tokens);
 
       if (!token || token === data.typeToken) return;
@@ -431,7 +432,7 @@ export function createOverloadDescriptor<
       if (!name) return;
 
       return {
-        contents: createHoverString(`parameter <${name}>`),
+        contents: createHoverString(`parameter <${name}>`, extraBody),
         range: token,
       };
     },
@@ -800,9 +801,17 @@ function provideSemantics(
   }
 }
 
-function createHoverString(headerCode: string): MarkupContent {
+function createHoverString(
+  headerCode: string,
+  extraBody?: string
+): MarkupContent {
+  let value = "```mlog\n" + headerCode + "\n```\n";
+  if (extraBody) {
+    value += "\n---\n\n";
+    value += extraBody;
+  }
   return {
     kind: MarkupKind.Markdown,
-    value: "```mlog\n" + headerCode + "\n```\n",
+    value,
   };
 }

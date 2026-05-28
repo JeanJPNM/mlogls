@@ -1300,7 +1300,7 @@ export function startServer(options: LanguageServerOptions) {
 
     if (!node) return;
 
-    return node.provideHover(params.position.character);
+    return node.provideHover(doc, params.position.character);
   });
 
   documents.onDidChangeContent(async (change) => {

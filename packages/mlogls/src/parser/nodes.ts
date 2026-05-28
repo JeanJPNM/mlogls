@@ -6,6 +6,7 @@ import {
   Diagnostic,
   DiagnosticSeverity,
   Hover,
+  MarkupKind,
   Range,
   SignatureHelp,
   TextEdit,
@@ -45,6 +46,8 @@ import { getSpellingSuggestionForName } from "../util/spelling";
 import { DiagnosingContext } from "../diagnosing_context";
 import { getLabelNames } from "../analysis/symbol_resolution";
 import { CompletionContext, TokenSemanticData } from "../analysis/types";
+import { getDocTextForLabel } from "../analysis/doc_comments";
+import { getLogicalScopes } from "../analysis/logical_scope";
 
 export abstract class SyntaxNode {
   start: ParserPosition;
@@ -196,7 +199,7 @@ export abstract class SyntaxNode {
     }
   }
 
-  provideHover(_character: number): Hover | undefined {
+  provideHover(_doc: MlogDocument, _character: number): Hover | undefined {
     return;
   }
 
@@ -208,8 +211,12 @@ export class CommentLine extends SyntaxNode {
     super(line);
   }
 
+  get trailingComment(): CommentToken {
+    return this.line.tokens[0] as CommentToken;
+  }
+
   get diagnosticDirective(): DiagnosticDirective | undefined {
-    return this.trailingComment?.diagnosticDirective;
+    return this.trailingComment.diagnosticDirective;
   }
 
   provideSignatureHelp(): SignatureHelp {
@@ -280,6 +287,28 @@ export class LabelDeclaration extends SyntaxNode {
         },
       },
     });
+  }
+
+  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+    const token = getTargetToken(character, this.line.tokens);
+    if (token === this.nameToken) {
+      const docText = getDocTextForLabel(
+        doc.nodes,
+        getLogicalScopes(doc.nodes),
+        this.name
+      );
+
+      if (docText) {
+        return {
+          contents: {
+            kind: MarkupKind.Markdown,
+            value: docText,
+          },
+          range: this.nameToken,
+        };
+      }
+    }
+    return undefined;
   }
 
   provideSignatureHelp(): SignatureHelp {
@@ -414,7 +443,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     }
   }
 
-  provideHover(character: number): Hover | undefined {
+  provideHover(doc: MlogDocument, character: number): Hover | undefined {
     return this.descriptor.provideHover(this.data, character, this.line.tokens);
   }
 
@@ -1277,6 +1306,27 @@ export class JumpInstruction extends InstructionNode<
     if (!suggestion) return;
 
     actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+  }
+
+  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+    const targetToken = getTargetToken(character, this.line.tokens);
+
+    let extraBody = "";
+
+    if (targetToken && targetToken === this.data.destination) {
+      extraBody = getDocTextForLabel(
+        doc.nodes,
+        getLogicalScopes(doc.nodes),
+        this.data.destination.content
+      );
+    }
+
+    return this.descriptor.provideHover(
+      this.data,
+      character,
+      this.line.tokens,
+      extraBody
+    );
   }
 }
 
