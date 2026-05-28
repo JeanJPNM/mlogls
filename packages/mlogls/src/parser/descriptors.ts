@@ -18,13 +18,13 @@ import {
   TokenModifiers,
   TokenTypes,
 } from "../protocol";
-import { CompletionContext, TokenSemanticData } from "../analysis";
 import { TextToken } from "./tokens";
 import { SymbolTable } from "../symbol";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { MlogDocument } from "../document";
 import { ignoreToken } from "../constants";
 import { DiagnosingContext } from "../diagnosing_context";
+import { CompletionContext, TokenSemanticData } from "../analysis/types";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 

@@ -48,21 +48,6 @@ import {
   getInstructionNames,
 } from "./parser/nodes";
 import { convertToLabeledJumps, convertToNumberedJumps } from "./refactoring";
-import {
-  CompletionContext,
-  findLabelDefinition,
-  findLabelReferences,
-  findLabelsInScope,
-  findVariableUsageLocations,
-  findVariableWriteLocations,
-  getDiagnosingContext,
-  getLabelBlocks,
-  LabelBlock,
-  labelDeclarationNameRange,
-  TokenSemanticData,
-  validateLabelUsage,
-  validateVariableUsage,
-} from "./analysis";
 import { ParameterType, ParameterUsage } from "./parser/descriptors";
 import { findRange, findRangeIndex } from "./util/range_search";
 import {
@@ -72,6 +57,24 @@ import {
   DiagnosticDirectiveScope,
   trailingCommentDiagnosticDirectiveKinds,
 } from "./parser/tokens";
+import {
+  findLabelsInScope,
+  getLogicalScopes,
+  LogicalScope,
+} from "./analysis/logical_scope";
+import {
+  findLabelDefinition,
+  findLabelReferences,
+  findVariableUsageLocations,
+  findVariableWriteLocations,
+  labelDeclarationNameRange,
+} from "./analysis/symbol_resolution";
+import { getDiagnosingContext } from "./analysis/suppression";
+import {
+  validateLabelUsage,
+  validateVariableUsage,
+} from "./analysis/validation";
+import { CompletionContext, TokenSemanticData } from "./analysis/types";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -1161,7 +1164,7 @@ export function startServer(options: LanguageServerOptions) {
     if (!doc) return [];
 
     const { nodes } = doc;
-    const root = getLabelBlocks(nodes);
+    const root = getLogicalScopes(nodes);
     const symbols: DocumentSymbol[] = [];
 
     const end = root.children[0]?.start ?? root.end;
@@ -1188,7 +1191,7 @@ export function startServer(options: LanguageServerOptions) {
       symbols.push(getBlockSymbols(child));
     }
 
-    function getBlockSymbols(block: LabelBlock): DocumentSymbol {
+    function getBlockSymbols(block: LogicalScope): DocumentSymbol {
       const label = nodes[block.start] as LabelDeclaration;
       const lastNode = nodes[block.end - 1];
       const end = block.children[0]?.start ?? block.end;
@@ -1236,15 +1239,15 @@ export function startServer(options: LanguageServerOptions) {
 
     const ranges: FoldingRange[] = [];
 
-    const root = getLabelBlocks(doc.nodes);
+    const root = getLogicalScopes(doc.nodes);
 
-    function traverse(block: LabelBlock) {
+    function traverse(scope: LogicalScope) {
       ranges.push({
-        startLine: nodes[block.start].start.line,
-        endLine: nodes[block.end - 1].end.line,
+        startLine: nodes[scope.start].start.line,
+        endLine: nodes[scope.end - 1].end.line,
       });
 
-      for (const child of block.children) {
+      for (const child of scope.children) {
         traverse(child);
       }
     }

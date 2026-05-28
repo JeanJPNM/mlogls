@@ -6,8 +6,8 @@ import {
   TextDocumentContentChangeEvent,
 } from "vscode-languageserver";
 import { SyntaxNode, getSyntaxNodes } from "./parser/nodes";
-import { getSymbolTable } from "./analysis";
 import { SymbolTable } from "./symbol";
+import { getSymbolTable } from "./analysis/symbol_resolution";
 
 export class MlogDocument implements TextDocument {
   #document: TextDocument;

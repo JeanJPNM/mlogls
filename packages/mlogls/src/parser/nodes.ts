@@ -34,11 +34,6 @@ import {
   stringTemplatePattern,
   waitVar,
 } from "../constants";
-import {
-  CompletionContext,
-  getLabelNames,
-  TokenSemanticData,
-} from "../analysis";
 import { MlogDocument } from "../document";
 import {
   CommentToken,
@@ -48,6 +43,8 @@ import {
 } from "./tokens";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { DiagnosingContext } from "../diagnosing_context";
+import { getLabelNames } from "../analysis/symbol_resolution";
+import { CompletionContext, TokenSemanticData } from "../analysis/types";
 
 export abstract class SyntaxNode {
   start: ParserPosition;
