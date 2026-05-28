@@ -22,7 +22,21 @@
   },
   "onEnterRules": [
     {
-      "beforeText": "^\\s*\\S+:\\s*$",
+      "beforeText": "^\\s*## ",
+      "action": {
+        "indent": "none",
+        "appendText": "## "
+      }
+    },
+    {
+      "beforeText": "^\\s*##",
+      "action": {
+        "indent": "none",
+        "appendText": "##"
+      }
+    },
+    {
+      "beforeText": "^\\s*\\S+:",
       "action": {
         "indent": "indent"
       }
