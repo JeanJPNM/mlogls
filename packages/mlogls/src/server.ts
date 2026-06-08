@@ -1099,12 +1099,35 @@ export function startServer(options: LanguageServerOptions) {
     const { position, newName } = params;
 
     const node = getSelectedSyntaxNode(doc, position);
+    if (!node) return;
 
     if (
       node instanceof LabelDeclaration &&
       containsPosition(node.nameToken, position)
     ) {
       const locations = findLabelReferences(node.name, doc.nodes);
+
+      return {
+        changes: {
+          [params.textDocument.uri]: locations.map((location) => ({
+            range: location,
+            newText: newName,
+          })),
+        },
+      };
+    }
+
+    if (isDocComment(node)) {
+      const data = getVarDocAnnotation(node);
+      if (!data) return;
+
+      const offset = position.character - node.start.character;
+      if (offset < data.variableStart || offset > data.annotationEnd) return;
+
+      const locations = findVariableUsageLocations(
+        data.variableName,
+        doc.nodes
+      );
 
       return {
         changes: {
@@ -1161,6 +1184,7 @@ export function startServer(options: LanguageServerOptions) {
     const { position } = params;
 
     const node = getSelectedSyntaxNode(doc, position);
+    if (!node) return;
 
     if (
       node instanceof LabelDeclaration &&
@@ -1169,6 +1193,24 @@ export function startServer(options: LanguageServerOptions) {
       return {
         range: labelDeclarationNameRange(node.nameToken),
         placeholder: node.name,
+      };
+    }
+
+    if (isDocComment(node)) {
+      const data = getVarDocAnnotation(node);
+      if (!data) return;
+
+      const offset = position.character - node.start.character;
+      if (offset < data.variableStart || offset > data.annotationEnd) return;
+
+      return {
+        range: Range.create(
+          node.start.line,
+          node.start.character + data.variableStart,
+          node.start.line,
+          node.start.character + data.annotationEnd
+        ),
+        placeholder: data.variableName,
       };
     }
 
