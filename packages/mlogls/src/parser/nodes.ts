@@ -291,24 +291,24 @@ export class LabelDeclaration extends SyntaxNode {
 
   provideHover(doc: MlogDocument, character: number): Hover | undefined {
     const token = getTargetToken(character, this.line.tokens);
-    if (token === this.nameToken) {
-      const docText = getDocTextForLabel(
-        doc.nodes,
-        getLogicalScopes(doc.nodes),
-        this.name
-      );
 
-      if (docText) {
-        return {
-          contents: {
-            kind: MarkupKind.Markdown,
-            value: docText,
-          },
-          range: this.nameToken,
-        };
-      }
-    }
-    return undefined;
+    if (token !== this.nameToken) return;
+
+    const docText = getDocTextForLabel(
+      doc.nodes,
+      getLogicalScopes(doc.nodes),
+      this.name
+    );
+
+    if (!docText) return;
+
+    return {
+      contents: {
+        kind: MarkupKind.Markdown,
+        value: docText,
+      },
+      range: this.nameToken,
+    };
   }
 
   provideSignatureHelp(): SignatureHelp {
@@ -444,7 +444,12 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
   }
 
   provideHover(doc: MlogDocument, character: number): Hover | undefined {
-    return this.descriptor.provideHover(this.data, character, this.line.tokens);
+    return this.descriptor.provideHover(
+      this.data,
+      character,
+      doc.nodes,
+      this.line.tokens
+    );
   }
 
   provideSignatureHelp(character: number): SignatureHelp {
@@ -1306,27 +1311,6 @@ export class JumpInstruction extends InstructionNode<
     if (!suggestion) return;
 
     actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
-  }
-
-  provideHover(doc: MlogDocument, character: number): Hover | undefined {
-    const targetToken = getTargetToken(character, this.line.tokens);
-
-    let extraBody = "";
-
-    if (targetToken && targetToken === this.data.destination) {
-      extraBody = getDocTextForLabel(
-        doc.nodes,
-        getLogicalScopes(doc.nodes),
-        this.data.destination.content
-      );
-    }
-
-    return this.descriptor.provideHover(
-      this.data,
-      character,
-      this.line.tokens,
-      extraBody
-    );
   }
 }
 
