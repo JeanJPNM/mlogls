@@ -28,7 +28,7 @@ export function getDocTextForLabel(
 
   if (commentEnd === -1) return "";
 
-  const headerStart = getLabelHeaderStart(nodes, root, commentEnd);
+  const headerStart = getMinimumLabelHeaderStart(nodes, root, commentEnd);
 
   const commentStart = getLabelDocCommentStart(nodes, headerStart, commentEnd);
 
@@ -44,7 +44,7 @@ export function getDocTextForLabel(
 }
 
 /** Returns the lowest node index that may be part of a label's doc comment */
-function getLabelHeaderStart(
+function getMinimumLabelHeaderStart(
   nodes: SyntaxNode[],
   root: LogicalScope,
   index: number
@@ -53,9 +53,10 @@ function getLabelHeaderStart(
     const child = root.children[i];
     if (child.start > index || child.end < index) continue;
 
-    if (child.start !== index) return getLabelHeaderStart(nodes, child, index);
+    if (child.start !== index)
+      return getMinimumLabelHeaderStart(nodes, child, index);
 
-    if (i === 0) return index;
+    if (i === 0) return root.start;
     const previous = root.children[i - 1];
     return previous.end;
   }
