@@ -9,6 +9,7 @@ import {
 } from "../parser/nodes";
 import { NameSymbol, SymbolFlags, SymbolTable } from "../symbol";
 import { TextToken } from "../parser/tokens";
+import { getVarDocAnnotation, isDocComment } from "./doc_comments";
 
 export const buildingNamePattern = /^([a-z]+)(\d+)$/;
 
@@ -72,6 +73,21 @@ export function findVariableUsageLocations(
 ) {
   const locations: Range[] = [];
   for (const node of nodes) {
+    if (isDocComment(node)) {
+      const data = getVarDocAnnotation(node);
+      if (data?.variableName !== variable) continue;
+
+      const base = node.trailingComment.start.character;
+      locations.push(
+        Range.create(
+          node.start.line,
+          base + data.variableStart,
+          node.end.line,
+          base + data.annotationEnd
+        )
+      );
+    }
+
     if (!(node instanceof InstructionNode)) continue;
 
     for (const param of node.parameters) {

@@ -1,7 +1,7 @@
 import { CommentLine, LabelDeclaration, SyntaxNode } from "../parser/nodes";
 import { LogicalScope } from "./logical_scope";
 
-function isDocComment(node: SyntaxNode): node is CommentLine {
+export function isDocComment(node: SyntaxNode): node is CommentLine {
   return (
     node instanceof CommentLine && node.trailingComment.content.startsWith("##")
   );
@@ -68,8 +68,10 @@ function getMinimumLabelHeaderStart(
 
 const varDocPrefix = /^##\s*@var\s+([^\s#;]+)/;
 
-interface VarDocData {
+export interface VarDocData {
   variableName: string;
+  /** The start position of the variable name relative to the token's content */
+  variableStart: number;
   /**
    * The end position of the annotation (prefix + variable name) relative to the
    * token's content
@@ -77,14 +79,19 @@ interface VarDocData {
   annotationEnd: number;
 }
 
-function getVarDocAnnotation(node: CommentLine): VarDocData | undefined {
+export function getVarDocAnnotation(node: CommentLine): VarDocData | undefined {
   const content = node.trailingComment.content;
   const match = content.match(varDocPrefix);
   if (!match) return;
 
+  const name = match[1];
+  const annotationEnd = match.index! + match[0].length;
+  const variableStart = annotationEnd - name.length;
+
   return {
-    variableName: match[1],
-    annotationEnd: match.index! + match[0].length,
+    variableName: name,
+    annotationEnd,
+    variableStart,
   };
 }
 

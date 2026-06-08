@@ -75,6 +75,7 @@ import {
   validateVariableUsage,
 } from "./analysis/validation";
 import { CompletionContext, TokenSemanticData } from "./analysis/types";
+import { getVarDocAnnotation, isDocComment } from "./analysis/doc_comments";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -976,6 +977,7 @@ export function startServer(options: LanguageServerOptions) {
 
     const { position } = params;
     const node = getSelectedSyntaxNode(doc, position);
+    if (!node) return;
 
     if (
       node instanceof LabelDeclaration &&
@@ -985,6 +987,21 @@ export function startServer(options: LanguageServerOptions) {
         uri: params.textDocument.uri,
         range: labelDeclarationNameRange(node.nameToken),
       };
+    }
+
+    if (isDocComment(node)) {
+      const data = getVarDocAnnotation(node);
+      if (!data) return;
+
+      const offset = position.character - node.start.character;
+      if (offset < data.variableStart || offset > data.annotationEnd) return;
+
+      return findVariableWriteLocations(data.variableName, doc.nodes).map(
+        (location) => ({
+          uri: params.textDocument.uri,
+          range: location,
+        })
+      );
     }
 
     if (!(node instanceof InstructionNode)) return;
@@ -1022,6 +1039,7 @@ export function startServer(options: LanguageServerOptions) {
     const { position } = params;
 
     const node = getSelectedSyntaxNode(doc, position);
+    if (!node) return;
 
     if (
       node instanceof LabelDeclaration &&
@@ -1033,6 +1051,21 @@ export function startServer(options: LanguageServerOptions) {
         uri: params.textDocument.uri,
         range: location,
       }));
+    }
+
+    if (isDocComment(node)) {
+      const data = getVarDocAnnotation(node);
+      if (!data) return;
+
+      const offset = position.character - node.start.character;
+      if (offset < data.variableStart || offset > data.annotationEnd) return;
+
+      return findVariableUsageLocations(data.variableName, doc.nodes).map(
+        (location) => ({
+          uri: params.textDocument.uri,
+          range: location,
+        })
+      );
     }
 
     if (!(node instanceof InstructionNode)) return;
