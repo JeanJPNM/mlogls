@@ -156,7 +156,7 @@ function getLabelDocCommentStart(
 
 /** Returns the index of the last node that is part of a variable's doc comment */
 function getVarDocCommentEnd(nodes: SyntaxNode[], start: number) {
-  let expectedLineNumber = nodes[start].start.line;
+  let expectedLineNumber = nodes[start].start.line + 1;
   let commentEnd = start + 1;
 
   for (let i = start + 1; i < nodes.length; i++) {
