@@ -46,7 +46,12 @@ import { getSpellingSuggestionForName } from "../util/spelling";
 import { DiagnosingContext } from "../diagnosing_context";
 import { getLabelNames } from "../analysis/symbol_resolution";
 import { CompletionContext, TokenSemanticData } from "../analysis/types";
-import { getDocTextForLabel } from "../analysis/doc_comments";
+import {
+  getDocTextForLabel,
+  getDocTextForVariable,
+  getVarDocAnnotation,
+  isDocComment,
+} from "../analysis/doc_comments";
 import { getLogicalScopes } from "../analysis/logical_scope";
 
 export abstract class SyntaxNode {
@@ -217,6 +222,31 @@ export class CommentLine extends SyntaxNode {
 
   get diagnosticDirective(): DiagnosticDirective | undefined {
     return this.trailingComment.diagnosticDirective;
+  }
+
+  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+    if (!isDocComment(this)) return;
+
+    const data = getVarDocAnnotation(this);
+    if (!data) return;
+
+    const offset = character - this.start.character;
+    if (offset < data.variableStart || offset > data.annotationEnd) return;
+
+    const docText = getDocTextForVariable(doc.nodes, data.variableName);
+
+    return {
+      contents: {
+        kind: MarkupKind.Markdown,
+        value: docText,
+      },
+      range: Range.create(
+        this.start.line,
+        this.start.character + data.variableStart,
+        this.start.line,
+        this.start.character + data.annotationEnd
+      ),
+    };
   }
 
   provideSignatureHelp(): SignatureHelp {
