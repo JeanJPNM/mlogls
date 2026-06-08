@@ -37,6 +37,8 @@ export function getDocTextForLabel(
   for (let i = commentStart; i < commentEnd; i++) {
     const node = nodes[i] as CommentLine;
 
+    if (getVarDocAnnotation(node)) break;
+
     docText += getDocCommentContent(node) + "\n";
   }
 
