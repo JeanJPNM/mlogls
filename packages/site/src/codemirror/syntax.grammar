@@ -1,6 +1,6 @@
 @top Program { statements? }
 
-@skip { whitespace | Comment }
+@skip { whitespace | Comment | DocComment }
 
 
 statements {
@@ -76,12 +76,14 @@ instructionSeparator { "\n" | ";" }
   ";"
   whitespace { @whitespace }
   Comment { "#" ![\n]* }
+  DocComment { "##" ![\n]* }
   identifier { ![ \t\n\r#;"] ![ \t\n\r#;]* }
   maybeLabelName { ![ \t\n\r#;"] ![ \t\n\r#;]* ":" }
 
   @precedence {
     "\n",
     whitespace,
+    DocComment,
     Comment,
     maybeLabelName,
     identifier

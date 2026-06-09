@@ -96,6 +96,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.38.4
         version: 6.38.4
+      '@lezer/common':
+        specifier: ^1.5.2
+        version: 1.5.2
       '@lezer/generator':
         specifier: ^1.8.0
         version: 1.8.0
@@ -645,8 +648,8 @@ packages:
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
-  '@lezer/common@1.2.3':
-    resolution: {integrity: sha512-w7ojc8ejBqr2REPsWxJjrMFsA/ysDCFICn8zEOR9mrqzOu2amhITYuLD8ag6XZf0CFXDrhKqw7+tW8cX66NaDA==}
+  '@lezer/common@1.5.2':
+    resolution: {integrity: sha512-sxQE460fPZyU3sdc8lafxiPwJHBzZRy/udNFynGQky1SePYBdhkBl1kOagA9uT3pxR8K09bOrmTUqA9wb/PjSQ==}
 
   '@lezer/generator@1.8.0':
     resolution: {integrity: sha512-/SF4EDWowPqV1jOgoGSGTIFsE7Ezdr7ZYxyihl5eMKVO5tlnpIhFcDavgm1hHY5GEonoOAEnJ0CU0x+tvuAuUg==}
@@ -2022,20 +2025,20 @@ snapshots:
       '@codemirror/language': 6.11.3
       '@codemirror/state': 6.5.2
       '@codemirror/view': 6.38.4
-      '@lezer/common': 1.2.3
+      '@lezer/common': 1.5.2
 
   '@codemirror/commands@6.8.1':
     dependencies:
       '@codemirror/language': 6.11.3
       '@codemirror/state': 6.5.2
       '@codemirror/view': 6.38.4
-      '@lezer/common': 1.2.3
+      '@lezer/common': 1.5.2
 
   '@codemirror/language@6.11.3':
     dependencies:
       '@codemirror/state': 6.5.2
       '@codemirror/view': 6.38.4
-      '@lezer/common': 1.2.3
+      '@lezer/common': 1.5.2
       '@lezer/highlight': 1.2.1
       '@lezer/lr': 1.4.2
       style-mod: 4.1.2
@@ -2308,20 +2311,20 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
-  '@lezer/common@1.2.3': {}
+  '@lezer/common@1.5.2': {}
 
   '@lezer/generator@1.8.0':
     dependencies:
-      '@lezer/common': 1.2.3
+      '@lezer/common': 1.5.2
       '@lezer/lr': 1.4.2
 
   '@lezer/highlight@1.2.1':
     dependencies:
-      '@lezer/common': 1.2.3
+      '@lezer/common': 1.5.2
 
   '@lezer/lr@1.4.2':
     dependencies:
-      '@lezer/common': 1.2.3
+      '@lezer/common': 1.5.2
 
   '@marijn/find-cluster-break@1.0.2': {}
 
