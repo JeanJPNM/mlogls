@@ -96,7 +96,11 @@ const docLanguage = StreamLanguage.define({
       return "docComment";
     }
 
-    if (state.phase === 1 && stream.match("@var")) {
+    if (
+      state.phase === 1 &&
+      stream.match("@var") &&
+      (stream.eol() || stream.match(/\s/, false))
+    ) {
       state.phase = 2;
       return "keyword";
     }
