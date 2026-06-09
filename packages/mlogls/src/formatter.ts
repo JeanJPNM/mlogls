@@ -1,24 +1,24 @@
-import { getLogicalScopes, LogicalScope } from "./analysis/logical_scope";
-import { MlogDocument } from "./document";
+import { AnalysisUnit } from "./analysis/analysis_unit";
+import { LogicalScope } from "./analysis/logical_scope";
 import { CommentLine, SyntaxNode } from "./parser/nodes";
 
 export interface FormatOptions {
-  doc: MlogDocument;
+  unit: AnalysisUnit;
   tabSize: number;
   insertSpaces: boolean;
   insertFinalNewline?: boolean;
 }
 
 export function formatCode({
-  doc,
+  unit,
   tabSize,
   insertSpaces,
   insertFinalNewline = true,
 }: FormatOptions): string {
-  const { nodes } = doc;
+  const { nodes } = unit;
   const identationUnit = insertSpaces ? " ".repeat(tabSize) : "\t";
 
-  const rootBlock = getLogicalScopes(doc.nodes);
+  const rootBlock = unit.rootScope;
 
   let result = "";
   let lineNumber = 0;

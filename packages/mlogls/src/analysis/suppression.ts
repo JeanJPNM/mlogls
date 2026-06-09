@@ -15,8 +15,8 @@ import {
   DiagnosticDirectiveScope,
 } from "../parser/tokens";
 import { DiagnosticCode } from "../protocol";
-import { getLogicalScopes, LogicalScope } from "./logical_scope";
-import { MlogDocument } from "../document";
+import { LogicalScope } from "./logical_scope";
+import { AnalysisUnit } from "./analysis_unit";
 
 type IndexedDiagnostic = [index: number, diagnostic: ParserDiagnostic];
 
@@ -318,13 +318,16 @@ function getDiagnosticSuppressionMapping(
   return [suppressionMapping, diagnostics, redudantItems];
 }
 
-export function getDiagnosingContext(doc: MlogDocument): DiagnosingContext {
-  const root = getLogicalScopes(doc.nodes);
+export function getDiagnosingContext(
+  unit: AnalysisUnit,
+  parserDiagnostics: ParserDiagnostic[]
+): DiagnosingContext {
+  const root = unit.rootScope;
   const [suppressionMapping, indexedDiagnostics, redundantItems] =
-    getDiagnosticSuppressionMapping(doc.uri, doc.nodes, root);
+    getDiagnosticSuppressionMapping(unit.uri, unit.nodes, root);
   const potentiallyUnusedItems = new Set<DiagnosticDirectiveItem>();
 
-  for (const node of doc.nodes) {
+  for (const node of unit.nodes) {
     const comment = node.trailingComment;
     const directive = comment?.diagnosticDirective;
 
@@ -341,7 +344,7 @@ export function getDiagnosingContext(doc: MlogDocument): DiagnosingContext {
   }
 
   const context = new DiagnosingContext(
-    [...doc.parserDiagnostics],
+    [...parserDiagnostics],
     suppressionMapping,
     potentiallyUnusedItems
   );

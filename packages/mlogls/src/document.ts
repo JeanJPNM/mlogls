@@ -1,31 +1,29 @@
 import { TextDocument } from "vscode-languageserver-textdocument";
-import { type ParserDiagnostic, tokenize, TokenLine } from "./parser/tokenize";
+import { type ParserDiagnostic, tokenize } from "./parser/tokenize";
 import {
   Position,
   Range,
   TextDocumentContentChangeEvent,
 } from "vscode-languageserver";
-import { SyntaxNode, getSyntaxNodes } from "./parser/nodes";
-import { SymbolTable } from "./symbol";
-import { getSymbolTable } from "./analysis/symbol_resolution";
+import { getSyntaxNodes } from "./parser/nodes";
+import { AnalysisUnit } from "./analysis/analysis_unit";
 
 export class MlogDocument implements TextDocument {
   #document: TextDocument;
-  #lines: TokenLine[] = [];
   #diagnostics: ParserDiagnostic[] = [];
-  #nodes: SyntaxNode[] = [];
-  #symbolTable: SymbolTable | undefined;
+  #unit: AnalysisUnit;
 
   constructor(uri: string, languageId: string, version: number, text: string) {
     this.#document = TextDocument.create(uri, languageId, version, text);
     if (this.isMlog) {
-      ({ lines: this.#lines, diagnostics: this.#diagnostics } = tokenize(text));
-      this.#nodes = getSyntaxNodes(this.#lines);
-    }
-  }
+      const { lines, diagnostics } = tokenize(text);
+      const nodes = getSyntaxNodes(lines);
 
-  get lines() {
-    return this.#lines;
+      this.#diagnostics = diagnostics;
+      this.#unit = new AnalysisUnit(uri, nodes);
+    } else {
+      this.#unit = new AnalysisUnit(uri, []);
+    }
   }
 
   get parserDiagnostics() {
@@ -33,7 +31,7 @@ export class MlogDocument implements TextDocument {
   }
 
   get nodes() {
-    return this.#nodes;
+    return this.#unit.nodes;
   }
 
   get uri() {
@@ -56,8 +54,8 @@ export class MlogDocument implements TextDocument {
     return this.languageId === "mlog";
   }
 
-  get symbolTable() {
-    return (this.#symbolTable ??= getSymbolTable(this.nodes));
+  get unit() {
+    return this.#unit;
   }
 
   getText(range?: Range): string {
@@ -72,16 +70,15 @@ export class MlogDocument implements TextDocument {
 
   update(changes: TextDocumentContentChangeEvent[], version: number) {
     TextDocument.update(this.#document, changes, version);
-    this.#symbolTable = undefined;
 
     if (this.isMlog) {
-      ({ lines: this.#lines, diagnostics: this.#diagnostics } = tokenize(
-        this.getText()
-      ));
-      this.#nodes = getSyntaxNodes(this.#lines);
+      const { lines, diagnostics } = tokenize(this.getText());
+      const nodes = getSyntaxNodes(lines);
+
+      this.#diagnostics = diagnostics;
+      this.#unit = new AnalysisUnit(this.uri, nodes);
     } else {
-      this.#lines = [];
-      this.#nodes = [];
+      this.#unit = new AnalysisUnit(this.uri, []);
     }
   }
 }

@@ -21,16 +21,14 @@ import {
 import { TextToken } from "./tokens";
 import { SymbolTable } from "../symbol";
 import { getSpellingSuggestionForName } from "../util/spelling";
-import { MlogDocument } from "../document";
 import { ignoreToken } from "../constants";
 import { DiagnosingContext } from "../diagnosing_context";
 import { CompletionContext, TokenSemanticData } from "../analysis/types";
-import { SyntaxNode } from "./nodes";
 import {
   getDocTextForLabel,
   getDocTextForVariable,
 } from "../analysis/doc_comments";
-import { getLogicalScopes } from "../analysis/logical_scope";
+import { AnalysisUnit } from "../analysis/analysis_unit";
 
 export const restrictedTokenCompletionKind = CompletionItemKind.EnumMember;
 
@@ -107,7 +105,7 @@ export interface InstructionDescriptor<Data> {
     nodeIndex: number
   ): void;
   provideCodeActions(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     diagnostic: Diagnostic,
     data: Data,
     tokens: TextToken[],
@@ -122,7 +120,7 @@ export interface InstructionDescriptor<Data> {
   provideHover(
     data: Data,
     character: number,
-    nodes: SyntaxNode[],
+    unit: AnalysisUnit,
     tokens: TextToken[]
   ): Hover | undefined;
 }
@@ -187,7 +185,7 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
-    provideHover(data, character, nodes, tokens) {
+    provideHover(data, character, unit, tokens) {
       const token = getTargetToken(character, tokens);
       if (!token) return;
 
@@ -197,7 +195,7 @@ export function createSingleDescriptor<const T extends SingleDescriptor>({
       return {
         contents: createHoverString(
           `parameter <${name}>`,
-          nodes,
+          unit,
           token,
           descriptor[name]
         ),
@@ -434,7 +432,7 @@ export function createOverloadDescriptor<
       actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
     },
     provideTokenSemantics: provideSemantics,
-    provideHover(data, character, nodes, tokens) {
+    provideHover(data, character, unit, tokens) {
       const token = getTargetToken(character, tokens);
 
       if (!token || token === data.typeToken) return;
@@ -445,7 +443,7 @@ export function createOverloadDescriptor<
       return {
         contents: createHoverString(
           `parameter <${name}>`,
-          nodes,
+          unit,
           token,
           pre?.[name] ?? overloads[data.$type]?.[name]
         ),
@@ -823,7 +821,7 @@ function mlogMarkdownBlock(code: string): string {
 
 function createHoverString(
   headerCode: string,
-  nodes: SyntaxNode[],
+  unit: AnalysisUnit,
   token: TextToken,
   param?: ParameterDescriptor
 ): MarkupContent {
@@ -831,9 +829,9 @@ function createHoverString(
   let docText = "";
 
   if (param?.isLabel) {
-    docText = getDocTextForLabel(nodes, getLogicalScopes(nodes), token.content);
+    docText = getDocTextForLabel(unit.nodes, unit.rootScope, token.content);
   } else if (!param?.restrict) {
-    docText = getDocTextForVariable(nodes, token.content);
+    docText = getDocTextForVariable(unit.nodes, token.content);
   }
 
   if (docText) {

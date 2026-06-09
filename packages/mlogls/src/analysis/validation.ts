@@ -1,7 +1,6 @@
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver";
 import { ignoreToken, maxLabelCount } from "../constants";
 import { DiagnosingContext } from "../diagnosing_context";
-import { MlogDocument } from "../document";
 import {
   InstructionNode,
   JumpInstruction,
@@ -10,14 +9,15 @@ import {
 import { DiagnosticCode } from "../protocol";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { ParameterType, ParameterUsage } from "../parser/descriptors";
+import { AnalysisUnit } from "./analysis_unit";
 
 export function validateLabelUsage(
-  doc: MlogDocument,
+  unit: AnalysisUnit,
   context: DiagnosingContext
 ) {
   let instructionCount = 0;
   let labelCount = 0;
-  const nodes = doc.nodes;
+  const nodes = unit.nodes;
   const labels = new Map<string, LabelDeclaration>();
   const unusedLabels = new Map<string, number>();
 
@@ -71,7 +71,7 @@ export function validateLabelUsage(
         {
           message: "The label is already declared here",
           location: {
-            uri: doc.uri,
+            uri: unit.uri,
             range: original.nameToken,
           },
         },
@@ -140,10 +140,10 @@ export function validateLabelUsage(
 }
 
 export function validateVariableUsage(
-  doc: MlogDocument,
+  unit: AnalysisUnit,
   context: DiagnosingContext
 ) {
-  const { symbolTable, nodes } = doc;
+  const { symbolTable, nodes } = unit;
 
   const unusedVariables = new Set<string>();
 

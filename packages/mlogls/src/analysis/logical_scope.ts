@@ -1,5 +1,6 @@
 import { CommentLine, LabelDeclaration, SyntaxNode } from "../parser/nodes";
 import { ParserPosition } from "../parser/tokens";
+import { AnalysisUnit } from "./analysis_unit";
 
 export interface LogicalScope {
   /**
@@ -138,11 +139,11 @@ export function getLogicalScopes(nodes: SyntaxNode[]) {
  * contains the index are returned.
  */
 export function findLabelsInScope(
-  nodes: SyntaxNode[],
+  unit: AnalysisUnit,
   currentNodeIndex: number
 ) {
   const labels = new Set<string>();
-  const root = getLogicalScopes(nodes);
+  const { nodes, rootScope: root } = unit;
 
   let parent: LogicalScope | undefined = root;
   while (parent) {

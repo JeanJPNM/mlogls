@@ -57,11 +57,7 @@ import {
   DiagnosticDirectiveScope,
   trailingCommentDiagnosticDirectiveKinds,
 } from "./parser/tokens";
-import {
-  findLabelsInScope,
-  getLogicalScopes,
-  LogicalScope,
-} from "./analysis/logical_scope";
+import { findLabelsInScope, LogicalScope } from "./analysis/logical_scope";
 import {
   findLabelDefinition,
   findLabelReferences,
@@ -388,15 +384,14 @@ export function startServer(options: LanguageServerOptions) {
 
   connection.languages.semanticTokens.on((params) => {
     const doc = documents.get(params.textDocument.uri);
-    const lines = doc?.lines;
     const data: number[] = [];
 
-    if (!lines || lines.length === 0) return { data };
+    if (!doc || doc.nodes.length === 0) return { data };
 
     const tokens: TokenSemanticData[] = [];
 
     for (const node of doc.nodes) {
-      node.provideTokenSemantics(doc, tokens);
+      node.provideTokenSemantics(doc.unit, tokens);
     }
 
     let previous = Position.create(0, 0);
@@ -451,7 +446,7 @@ export function startServer(options: LanguageServerOptions) {
 
       for (const token of node.line.tokens) {
         if (token.isIdentifier()) {
-          const symbol = doc.symbolTable.get(token.content);
+          const symbol = doc.unit.symbolTable.get(token.content);
           if (!symbol?.color) continue;
 
           colors.push({
@@ -682,7 +677,7 @@ export function startServer(options: LanguageServerOptions) {
       getVariableCompletions() {
         const completions: CompletionItem[] = [];
 
-        for (const symbol of doc.symbolTable.values()) {
+        for (const symbol of doc.unit.symbolTable.values()) {
           completions.push({
             label: symbol.name,
             kind: symbol.isKeyword
@@ -699,7 +694,7 @@ export function startServer(options: LanguageServerOptions) {
         return completions;
       },
       getLabelCompletions() {
-        return [...findLabelsInScope(doc.nodes, nodeIndex)].map((label) => ({
+        return [...findLabelsInScope(doc.unit, nodeIndex)].map((label) => ({
           label,
           kind: CompletionItemKind.Function,
         }));
@@ -731,11 +726,11 @@ export function startServer(options: LanguageServerOptions) {
   connection.onDocumentFormatting((params) => {
     const doc = documents.get(params.textDocument.uri);
     if (!doc) return;
-    if (doc.lines.length === 0) return;
+    if (doc.nodes.length === 0) return;
     const { options } = params;
 
     const formattedCode = formatCode({
-      doc,
+      unit: doc.unit,
       insertSpaces: options.insertSpaces,
       tabSize: options.tabSize,
       insertFinalNewline: options.insertFinalNewline,
@@ -804,7 +799,7 @@ export function startServer(options: LanguageServerOptions) {
       for (const diagnostic of params.context.diagnostics) {
         if (!containsPosition(node, diagnostic.range.start)) continue;
 
-        node.provideCodeActions(doc, diagnostic, actions);
+        node.provideCodeActions(doc.unit, diagnostic, actions);
       }
 
       for (const [code, diagnostics] of codes) {
@@ -1232,7 +1227,7 @@ export function startServer(options: LanguageServerOptions) {
     if (!doc) return [];
 
     const { nodes } = doc;
-    const root = getLogicalScopes(nodes);
+    const root = doc.unit.rootScope;
     const symbols: DocumentSymbol[] = [];
 
     const end = root.children[0]?.start ?? root.end;
@@ -1307,7 +1302,7 @@ export function startServer(options: LanguageServerOptions) {
 
     const ranges: FoldingRange[] = [];
 
-    const root = getLogicalScopes(doc.nodes);
+    const root = doc.unit.rootScope;
 
     function traverse(scope: LogicalScope) {
       ranges.push({
@@ -1368,21 +1363,21 @@ export function startServer(options: LanguageServerOptions) {
 
     if (!node) return;
 
-    return node.provideHover(doc, params.position.character);
+    return node.provideHover(doc.unit, params.position.character);
   });
 
   documents.onDidChangeContent(async (change) => {
     const doc = documents.get(change.document.uri);
     if (!doc) return;
 
-    const context = getDiagnosingContext(doc);
+    const context = getDiagnosingContext(doc.unit, doc.parserDiagnostics);
 
     let instructionCount = 0;
     let tooManyInstructionsRange: { start: number; end: number } | undefined;
 
     for (let i = 0; i < doc.nodes.length; i++) {
       const node = doc.nodes[i];
-      node.provideDiagnostics(doc, context, i);
+      node.provideDiagnostics(doc.unit, context, i);
 
       if (node instanceof InstructionNode) {
         instructionCount++;
@@ -1408,8 +1403,8 @@ export function startServer(options: LanguageServerOptions) {
       });
     }
 
-    validateLabelUsage(doc, context);
-    validateVariableUsage(doc, context);
+    validateLabelUsage(doc.unit, context);
+    validateVariableUsage(doc.unit, context);
     context.reportUnusedItems(doc.nodes);
 
     const diagnostics: Diagnostic[] = [];

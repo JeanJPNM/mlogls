@@ -35,7 +35,6 @@ import {
   stringTemplatePattern,
   waitVar,
 } from "../constants";
-import { MlogDocument } from "../document";
 import {
   CommentToken,
   DiagnosticDirective,
@@ -52,7 +51,7 @@ import {
   getVarDocAnnotation,
   VarDocData,
 } from "../analysis/doc_comments";
-import { getLogicalScopes } from "../analysis/logical_scope";
+import { AnalysisUnit } from "../analysis/analysis_unit";
 
 export abstract class SyntaxNode {
   start: ParserPosition;
@@ -71,7 +70,7 @@ export abstract class SyntaxNode {
   }
 
   provideDiagnostics(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     context: DiagnosingContext,
     nodeIndex: number
   ): void {
@@ -159,12 +158,12 @@ export abstract class SyntaxNode {
   }
 
   provideTokenSemantics(
-    _doc: MlogDocument,
+    _unit: AnalysisUnit,
     _tokens: TokenSemanticData[]
   ): void {}
 
   provideCodeActions(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
@@ -186,7 +185,7 @@ export abstract class SyntaxNode {
         );
         if (!suggestion) return;
 
-        actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+        actions.push(createSpellingAction(diagnostic, unit.uri, suggestion));
       }
     } else if (token?.isColorLiteral() && token.tag) {
       const offset = diagnostic.range.start.character - token.start.character;
@@ -200,11 +199,11 @@ export abstract class SyntaxNode {
       );
       if (!suggestion) return;
 
-      actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+      actions.push(createSpellingAction(diagnostic, unit.uri, suggestion));
     }
   }
 
-  provideHover(_doc: MlogDocument, _character: number): Hover | undefined {
+  provideHover(_unit: AnalysisUnit, _character: number): Hover | undefined {
     return;
   }
 
@@ -227,7 +226,7 @@ export class CommentLine extends SyntaxNode {
     return this.trailingComment.diagnosticDirective;
   }
 
-  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+  provideHover(unit: AnalysisUnit, character: number): Hover | undefined {
     if (!this.docAnnotation) return;
 
     const { annotationEnd, variableStart, variableName } = this.docAnnotation;
@@ -235,7 +234,7 @@ export class CommentLine extends SyntaxNode {
     const offset = character - this.start.character;
     if (offset < variableStart || offset > annotationEnd) return;
 
-    const docText = getDocTextForVariable(doc.nodes, variableName);
+    const docText = getDocTextForVariable(unit.nodes, variableName);
 
     return {
       contents: {
@@ -275,11 +274,11 @@ export class LabelDeclaration extends SyntaxNode {
   }
 
   provideDiagnostics(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     context: DiagnosingContext,
     nodeIndex: number
   ): void {
-    super.provideDiagnostics(doc, context, nodeIndex);
+    super.provideDiagnostics(unit, context, nodeIndex);
 
     const { tokens } = this.line;
 
@@ -302,11 +301,11 @@ export class LabelDeclaration extends SyntaxNode {
   }
 
   provideCodeActions(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
-    super.provideCodeActions(doc, diagnostic, actions);
+    super.provideCodeActions(unit, diagnostic, actions);
     if (diagnostic.code !== DiagnosticCode.unexpectedToken) return;
 
     actions.push({
@@ -315,22 +314,18 @@ export class LabelDeclaration extends SyntaxNode {
       isPreferred: true,
       edit: {
         changes: {
-          [doc.uri]: [TextEdit.del(diagnostic.range)],
+          [unit.uri]: [TextEdit.del(diagnostic.range)],
         },
       },
     });
   }
 
-  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+  provideHover(unit: AnalysisUnit, character: number): Hover | undefined {
     const token = getTargetToken(character, this.line.tokens);
 
     if (token !== this.nameToken) return;
 
-    const docText = getDocTextForLabel(
-      doc.nodes,
-      getLogicalScopes(doc.nodes),
-      this.name
-    );
+    const docText = getDocTextForLabel(unit.nodes, unit.rootScope, this.name);
 
     if (!docText) return;
 
@@ -376,13 +371,13 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
   }
 
   provideDiagnostics(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     context: DiagnosingContext,
     nodeIndex: number
   ): void {
-    super.provideDiagnostics(doc, context, nodeIndex);
+    super.provideDiagnostics(unit, context, nodeIndex);
     this.descriptor.provideDiagnostics(
-      doc.symbolTable,
+      unit.symbolTable,
       this.data,
       this.line.tokens,
       this.parameters,
@@ -391,7 +386,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     );
   }
 
-  provideTokenSemantics(doc: MlogDocument, tokens: TokenSemanticData[]): void {
+  provideTokenSemantics(unit: AnalysisUnit, tokens: TokenSemanticData[]): void {
     if (this.affectsControlFlow) {
       tokens.push({
         token: this.line.tokens[0],
@@ -399,20 +394,20 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
       });
     }
     this.descriptor.provideTokenSemantics(
-      doc.symbolTable,
+      unit.symbolTable,
       this.parameters,
       tokens
     );
   }
 
   provideCodeActions(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
-    super.provideCodeActions(doc, diagnostic, actions);
+    super.provideCodeActions(unit, diagnostic, actions);
     this.descriptor.provideCodeActions(
-      doc,
+      unit,
       diagnostic,
       this.data,
       this.line.tokens,
@@ -426,7 +421,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
           title: `Replace with ${ignoreToken}`,
           edit: {
             changes: {
-              [doc.uri]: [TextEdit.replace(diagnostic.range, ignoreToken)],
+              [unit.uri]: [TextEdit.replace(diagnostic.range, ignoreToken)],
             },
           },
           diagnostics: [diagnostic],
@@ -441,7 +436,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
           isPreferred: true,
           edit: {
             changes: {
-              [doc.uri]: [TextEdit.del(diagnostic.range)],
+              [unit.uri]: [TextEdit.del(diagnostic.range)],
             },
           },
           diagnostics: [diagnostic],
@@ -451,7 +446,7 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
         actions.push(
           createCommandAction({
             command: CommandCode.removeAllUnusedParameters,
-            arguments: [{ uri: doc.uri }],
+            arguments: [{ uri: unit.uri }],
             title: "Remove all unused parameters",
             kind: CodeActionKind.QuickFix,
           })
@@ -466,20 +461,20 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
 
         const suggestion = getSpellingSuggestionForName(
           token.content,
-          doc.symbolTable.keys()
+          unit.symbolTable.keys()
         );
         if (!suggestion) break;
 
-        actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+        actions.push(createSpellingAction(diagnostic, unit.uri, suggestion));
       }
     }
   }
 
-  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+  provideHover(unit: AnalysisUnit, character: number): Hover | undefined {
     return this.descriptor.provideHover(
       this.data,
       character,
-      doc.nodes,
+      unit,
       this.line.tokens
     );
   }
@@ -549,11 +544,11 @@ export class UnknownInstruction extends InstructionNode<
   }
 
   provideDiagnostics(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     context: DiagnosingContext,
     nodeIndex: number
   ): void {
-    super.provideDiagnostics(doc, context, nodeIndex);
+    super.provideDiagnostics(unit, context, nodeIndex);
 
     const [name] = this.line.tokens;
     let message = `Unknown instruction: ${name.content}`;
@@ -574,11 +569,11 @@ export class UnknownInstruction extends InstructionNode<
   }
 
   provideCodeActions(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
-    super.provideCodeActions(doc, diagnostic, actions);
+    super.provideCodeActions(unit, diagnostic, actions);
 
     if (diagnostic.code !== DiagnosticCode.unknownInstruction) return;
 
@@ -590,7 +585,7 @@ export class UnknownInstruction extends InstructionNode<
 
     if (!suggestion) return;
 
-    actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+    actions.push(createSpellingAction(diagnostic, unit.uri, suggestion));
   }
 }
 
@@ -1139,11 +1134,11 @@ export class PackColorInstruction extends InstructionNode<
   }
 
   provideDiagnostics(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     context: DiagnosingContext,
     nodeIndex: number
   ): void {
-    super.provideDiagnostics(doc, context, nodeIndex);
+    super.provideDiagnostics(unit, context, nodeIndex);
 
     const { red, green, blue, alpha } = this.data;
 
@@ -1178,11 +1173,11 @@ export class PackColorInstruction extends InstructionNode<
   }
 
   provideCodeActions(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
-    super.provideCodeActions(doc, diagnostic, actions);
+    super.provideCodeActions(unit, diagnostic, actions);
     if (diagnostic.code !== DiagnosticCode.excessPackcolorPrecision) return;
 
     const number = getTargetToken(
@@ -1200,7 +1195,7 @@ export class PackColorInstruction extends InstructionNode<
       isPreferred: true,
       edit: {
         changes: {
-          [doc.uri]: [TextEdit.replace(diagnostic.range, newText)],
+          [unit.uri]: [TextEdit.replace(diagnostic.range, newText)],
         },
       },
       diagnostics: [diagnostic],
@@ -1326,23 +1321,23 @@ export class JumpInstruction extends InstructionNode<
   }
 
   provideCodeActions(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
-    super.provideCodeActions(doc, diagnostic, actions);
+    super.provideCodeActions(unit, diagnostic, actions);
 
     const name = this.data.destination?.content;
     if (!name || diagnostic.code !== DiagnosticCode.undefinedLabel) return;
 
     const suggestion = getSpellingSuggestionForName(
       name,
-      getLabelNames(doc.nodes)
+      getLabelNames(unit.nodes)
     );
 
     if (!suggestion) return;
 
-    actions.push(createSpellingAction(diagnostic, doc.uri, suggestion));
+    actions.push(createSpellingAction(diagnostic, unit.uri, suggestion));
   }
 }
 
@@ -2515,7 +2510,7 @@ export class SetMarkerInstruction extends InstructionNode<
   }
 
   provideDiagnostics(
-    doc: MlogDocument,
+    unit: AnalysisUnit,
     context: DiagnosingContext,
     nodeIndex: number
   ): void {
@@ -2532,7 +2527,7 @@ export class SetMarkerInstruction extends InstructionNode<
     if (suppressIncompleteInstruction) {
       context.disable(DiagnosticCode.incompleteInstruction);
     }
-    super.provideDiagnostics(doc, context, nodeIndex);
+    super.provideDiagnostics(unit, context, nodeIndex);
     if (suppressIncompleteInstruction) {
       context.enable(DiagnosticCode.incompleteInstruction);
     }
