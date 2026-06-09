@@ -4,7 +4,7 @@ title: Language Features
 
 # Language Features
 
-`mlogls` introduces advanced language features on top of standard Mindustry Logic (mlog) to help you structure your code and manage diagnostics effectively.
+`mlogls` introduces advanced language features on top of standard Mindustry Logic (mlog) to help you structure and manage your code effectively.
 
 ## Logical Label Scopes
 
@@ -87,4 +87,79 @@ label1:
 # The state reverts! unusedVariable is ignored again here.
 label3:
     set z 1
+```
+
+## Documentation comments
+
+To improve the experience of writing complex code, you can write documentation comments to annotate your labels and variables. These annotations fully support **Markdown** formatting and will be displayed when hovering over the label or variable elsewhere in your code.
+
+Documentation comments placed right before labels annotate them automatically.
+
+```mlog
+## Finds an available unit based on its `@controller`
+##
+## Aborts if no unit is found
+findUnit:
+   ubind findUnit.type
+   # ...
+```
+
+On the other hand, variable documentation comments can be placed anywhere in the file, since they already declare which variable is being annotated.
+
+```mlog
+## @var x This is a documentation comment for x
+## using **markdown** syntax.
+
+# this variable is not annotated
+set unrelatedVariable 0
+```
+
+::: info
+This design choice was made because many mlog instructions have multiple output
+parameters, so using the same mechanism as labels would result in ambiguous comments.
+:::
+
+Documentation comments must be contiguous, and in the case of labels they must also be placed immediately before them.
+
+```mlog
+## This annotates the label
+label_0:
+
+## This does not
+
+label_1:
+
+## This is not part of the doc comment
+
+## This is
+label_2:
+
+
+## @var x This annotates x
+##
+## This is also part of x's annotation
+
+## This doesn't annotate x
+```
+
+### Mixing Label and Variable documentation
+
+You can place variable documentation comments at the bottom of a label's doc comment block. This is especially useful for documenting variables that are scoped or initialized right after a label. The label will parse the documentation up to the first `@var` annotation, and the variable will capture its respective annotation.
+
+```mlog
+## Computes the factorial of a number
+## @var factorial.result The final output of the computation
+factorial:
+   set factorial.result 1
+```
+
+### Interruption by regular comments
+
+Be aware that regular comments (`#`) will break a contiguous block of doc comments (`##`). Only the doc comments immediately above the label (after the regular comment) will be attached to it.
+
+```mlog
+## This will NOT be part of the label's documentation
+# TODO: Refactor this subroutine
+## This IS the label's documentation
+label:
 ```

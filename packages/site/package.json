@@ -20,6 +20,7 @@
     "@codemirror/lsp-client": "^6.1.2",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.38.4",
+    "@lezer/common": "^1.5.2",
     "@lezer/generator": "^1.8.0",
     "@lezer/highlight": "^1.2.1",
     "@lezer/lr": "^1.4.2",

@@ -3,14 +3,31 @@ fileTypes:
   - mlog
 scopeName: source.mlog
 patterns:
+  - include: "#doc_comment"
   - include: "#comment"
   - include: "#label"
   - include: "#statement"
   - include: "#semicolon"
 repository:
+  doc_comment:
+    patterns:
+      - name: comment.block.documentation.mlog
+        match: (##)\s*(@var)\s+([^\s#;]+).*$
+        captures:
+          1:
+            name: punctuation.definition.comment.mlog
+          2:
+            name: keyword.documentation.mlog
+          3:
+            name: variable.other.documentation.mlog
+      - name: comment.block.documentation.mlog
+        match: (##).*$
+        captures:
+          1:
+            name: punctuation.definition.comment.mlog
   comment:
     name: comment.line.number-sign.mlog
-    match: (#+).*$
+    match: (#).*$
     captures:
       1:
         name: punctuation.definition.comment.mlog

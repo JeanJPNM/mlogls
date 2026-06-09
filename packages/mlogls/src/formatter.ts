@@ -1,4 +1,4 @@
-import { getLabelBlocks, LabelBlock } from "./analysis";
+import { getLogicalScopes, LogicalScope } from "./analysis/logical_scope";
 import { MlogDocument } from "./document";
 import { CommentLine, SyntaxNode } from "./parser/nodes";
 
@@ -18,7 +18,7 @@ export function formatCode({
   const { nodes } = doc;
   const identationUnit = insertSpaces ? " ".repeat(tabSize) : "\t";
 
-  const rootBlock = getLabelBlocks(doc.nodes);
+  const rootBlock = getLogicalScopes(doc.nodes);
 
   let result = "";
   let lineNumber = 0;
@@ -76,22 +76,22 @@ interface IndentationBlock {
 }
 
 function* indentationBlocks(
-  block: LabelBlock,
+  scope: LogicalScope,
   nodes: SyntaxNode[]
 ): Generator<IndentationBlock> {
-  const { children } = block;
+  const { children } = scope;
   if (children.length === 0) {
     yield {
       // the root block does not have a label to skip
-      start: block.level === 0 ? block.start : block.start + 1,
-      end: block.end,
+      start: scope.level === 0 ? scope.start : scope.start + 1,
+      end: scope.end,
       extraLine: false,
-      level: block.level,
+      level: scope.level,
     };
     return;
   }
 
-  let start = block.start;
+  let start = scope.start;
 
   for (const child of children) {
     let headerStart = child.start;
@@ -118,20 +118,20 @@ function* indentationBlocks(
       // because at that point, the index of the instruction
       // will be greater than `start`, which means that
       // the extra line will not be added
-      yield { start, end: headerStart, level: block.level, extraLine: true };
+      yield { start, end: headerStart, level: scope.level, extraLine: true };
     }
 
     yield {
       start: headerStart,
       end: headerEnd,
-      level: block.level,
+      level: scope.level,
       extraLine: true,
     };
     yield* indentationBlocks(child, nodes);
     start = child.end;
   }
 
-  if (start !== block.end) {
-    yield { start, end: block.end, level: block.level, extraLine: true };
+  if (start !== scope.end) {
+    yield { start, end: scope.end, level: scope.level, extraLine: true };
   }
 }

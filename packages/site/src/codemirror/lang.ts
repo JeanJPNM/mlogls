@@ -1,5 +1,10 @@
-import { indentNodeProp, LRLanguage } from "@codemirror/language";
+import {
+  indentNodeProp,
+  LRLanguage,
+  StreamLanguage,
+} from "@codemirror/language";
 import { parser } from "./syntax.grammar";
+import { parseMixed } from "@lezer/common";
 import { styleTags, tags as t } from "@lezer/highlight";
 
 // use this https://lezer-playground.vercel.app/
@@ -7,6 +12,12 @@ import { styleTags, tags as t } from "@lezer/highlight";
 const language = LRLanguage.define({
   name: "mlog",
   parser: parser.configure({
+    wrap: parseMixed((node) => {
+      if (node.name === "DocComment") {
+        return { parser: docLanguage.parser };
+      }
+      return null;
+    }),
     props: [
       indentNodeProp.add(() => {
         return (context) => {
@@ -47,6 +58,7 @@ const language = LRLanguage.define({
       styleTags({
         Identifier: t.variableName,
         Comment: t.lineComment,
+        DocComment: t.docComment,
         Boolean: t.bool,
         Color: t.number,
         LabelDeclaration: t.function(t.name),
@@ -71,3 +83,30 @@ const language = LRLanguage.define({
 export function mlogLanguage() {
   return language;
 }
+
+const docLanguage = StreamLanguage.define({
+  startState() {
+    return { phase: 0 };
+  },
+  token(stream, state) {
+    if (stream.eatSpace()) return null;
+
+    if (state.phase === 0 && stream.match("##")) {
+      state.phase = 1;
+      return "docComment";
+    }
+
+    if (state.phase === 1 && stream.match("@var")) {
+      state.phase = 2;
+      return "keyword";
+    }
+
+    if (state.phase === 2 && stream.match(/[^\s#;]+/)) {
+      state.phase = 3;
+      return "variableName";
+    }
+
+    stream.skipToEnd();
+    return "docComment";
+  },
+});

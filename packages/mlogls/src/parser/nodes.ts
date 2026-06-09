@@ -6,6 +6,7 @@ import {
   Diagnostic,
   DiagnosticSeverity,
   Hover,
+  MarkupKind,
   Range,
   SignatureHelp,
   TextEdit,
@@ -34,11 +35,6 @@ import {
   stringTemplatePattern,
   waitVar,
 } from "../constants";
-import {
-  CompletionContext,
-  getLabelNames,
-  TokenSemanticData,
-} from "../analysis";
 import { MlogDocument } from "../document";
 import {
   CommentToken,
@@ -48,6 +44,15 @@ import {
 } from "./tokens";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { DiagnosingContext } from "../diagnosing_context";
+import { getLabelNames } from "../analysis/symbol_resolution";
+import { CompletionContext, TokenSemanticData } from "../analysis/types";
+import {
+  getDocTextForLabel,
+  getDocTextForVariable,
+  getVarDocAnnotation,
+  isDocComment,
+} from "../analysis/doc_comments";
+import { getLogicalScopes } from "../analysis/logical_scope";
 
 export abstract class SyntaxNode {
   start: ParserPosition;
@@ -199,7 +204,7 @@ export abstract class SyntaxNode {
     }
   }
 
-  provideHover(_character: number): Hover | undefined {
+  provideHover(_doc: MlogDocument, _character: number): Hover | undefined {
     return;
   }
 
@@ -211,8 +216,37 @@ export class CommentLine extends SyntaxNode {
     super(line);
   }
 
+  get trailingComment(): CommentToken {
+    return this.line.tokens[0] as CommentToken;
+  }
+
   get diagnosticDirective(): DiagnosticDirective | undefined {
-    return this.trailingComment?.diagnosticDirective;
+    return this.trailingComment.diagnosticDirective;
+  }
+
+  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+    if (!isDocComment(this)) return;
+
+    const data = getVarDocAnnotation(this);
+    if (!data) return;
+
+    const offset = character - this.start.character;
+    if (offset < data.variableStart || offset > data.annotationEnd) return;
+
+    const docText = getDocTextForVariable(doc.nodes, data.variableName);
+
+    return {
+      contents: {
+        kind: MarkupKind.Markdown,
+        value: docText,
+      },
+      range: Range.create(
+        this.start.line,
+        this.start.character + data.variableStart,
+        this.start.line,
+        this.start.character + data.annotationEnd
+      ),
+    };
   }
 
   provideSignatureHelp(): SignatureHelp {
@@ -283,6 +317,28 @@ export class LabelDeclaration extends SyntaxNode {
         },
       },
     });
+  }
+
+  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+    const token = getTargetToken(character, this.line.tokens);
+
+    if (token !== this.nameToken) return;
+
+    const docText = getDocTextForLabel(
+      doc.nodes,
+      getLogicalScopes(doc.nodes),
+      this.name
+    );
+
+    if (!docText) return;
+
+    return {
+      contents: {
+        kind: MarkupKind.Markdown,
+        value: docText,
+      },
+      range: this.nameToken,
+    };
   }
 
   provideSignatureHelp(): SignatureHelp {
@@ -417,8 +473,13 @@ export abstract class InstructionNode<Data> extends SyntaxNode {
     }
   }
 
-  provideHover(character: number): Hover | undefined {
-    return this.descriptor.provideHover(this.data, character, this.line.tokens);
+  provideHover(doc: MlogDocument, character: number): Hover | undefined {
+    return this.descriptor.provideHover(
+      this.data,
+      character,
+      doc.nodes,
+      this.line.tokens
+    );
   }
 
   provideSignatureHelp(character: number): SignatureHelp {
