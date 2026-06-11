@@ -7,7 +7,7 @@ import { debounce } from "./utils";
 import { Compartment, EditorState, Text } from "@codemirror/state";
 import { vscodeDarkInit, vscodeLightInit } from "@uiw/codemirror-theme-vscode";
 import { useData } from "vitepress";
-import { mlogLanguage } from "./codemirror/lang";
+import { continueDocCommentKeymap, mlogLanguage } from "./codemirror/lang";
 import { tags } from "@lezer/highlight";
 import {
   findReferencesKeymap,
@@ -102,6 +102,7 @@ onMounted(() => {
 
     extensions: [
       EditorState.tabSize.of(2),
+      keymap.of(continueDocCommentKeymap),
       basicSetup,
       theme.of(currentTheme.value),
       EditorView.theme({

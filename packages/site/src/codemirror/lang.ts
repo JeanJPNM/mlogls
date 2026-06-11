@@ -6,6 +6,7 @@ import {
 import { parser } from "./syntax.grammar";
 import { parseMixed } from "@lezer/common";
 import { styleTags, tags as t } from "@lezer/highlight";
+import { KeyBinding } from "@codemirror/view";
 
 // use this https://lezer-playground.vercel.app/
 // playground to test the grammar
@@ -114,3 +115,32 @@ const docLanguage = StreamLanguage.define({
     return "docComment";
   },
 });
+
+export const continueDocCommentKeymap: KeyBinding[] = [
+  {
+    key: "Enter",
+    run(view) {
+      const { state } = view;
+
+      const selection = state.selection.main;
+      const line = state.doc.lineAt(selection.head);
+      const match = line.text.match(/^(\s*)##(\s)?/);
+      if (!match) return false;
+
+      const indent = match[1];
+      const after = match[2] ? " " : "";
+      const insertText = `\n${indent}##${after}`;
+
+      view.dispatch({
+        changes: {
+          from: selection.head,
+          to: selection.head,
+          insert: insertText,
+        },
+        selection: { anchor: selection.head + insertText.length },
+      });
+
+      return true;
+    },
+  },
+];
