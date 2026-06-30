@@ -99,7 +99,7 @@ const docLanguage = StreamLanguage.define({
 
     if (
       state.phase === 1 &&
-      stream.match("@var") &&
+      (stream.match("@external") || stream.match("@local")) &&
       (stream.eol() || stream.match(/\s/, false))
     ) {
       state.phase = 2;

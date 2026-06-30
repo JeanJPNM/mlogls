@@ -50,7 +50,7 @@ import {
   getDocTextForLabel,
   getDocTextForVariable,
   getVarDocAnnotation,
-  isDocComment,
+  VarDocData,
 } from "../analysis/doc_comments";
 import { getLogicalScopes } from "../analysis/logical_scope";
 
@@ -212,8 +212,11 @@ export abstract class SyntaxNode {
 }
 
 export class CommentLine extends SyntaxNode {
+  docAnnotation?: VarDocData;
+
   constructor(line: TokenLine) {
     super(line);
+    this.docAnnotation = getVarDocAnnotation(this);
   }
 
   get trailingComment(): CommentToken {
@@ -225,15 +228,14 @@ export class CommentLine extends SyntaxNode {
   }
 
   provideHover(doc: MlogDocument, character: number): Hover | undefined {
-    if (!isDocComment(this)) return;
+    if (!this.docAnnotation) return;
 
-    const data = getVarDocAnnotation(this);
-    if (!data) return;
+    const { annotationEnd, variableStart, variableName } = this.docAnnotation;
 
     const offset = character - this.start.character;
-    if (offset < data.variableStart || offset > data.annotationEnd) return;
+    if (offset < variableStart || offset > annotationEnd) return;
 
-    const docText = getDocTextForVariable(doc.nodes, data.variableName);
+    const docText = getDocTextForVariable(doc.nodes, variableName);
 
     return {
       contents: {
@@ -242,9 +244,9 @@ export class CommentLine extends SyntaxNode {
       },
       range: Range.create(
         this.start.line,
-        this.start.character + data.variableStart,
+        this.start.character + variableStart,
         this.start.line,
-        this.start.character + data.annotationEnd
+        this.start.character + annotationEnd
       ),
     };
   }

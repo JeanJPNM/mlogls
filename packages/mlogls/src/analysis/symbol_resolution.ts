@@ -2,6 +2,7 @@ import { Range } from "vscode-languageserver";
 import { buildingLinkNames, ignoreToken } from "../constants";
 import { ParameterType, ParameterUsage } from "../parser/descriptors";
 import {
+  CommentLine,
   InstructionNode,
   JumpInstruction,
   LabelDeclaration,
@@ -9,7 +10,6 @@ import {
 } from "../parser/nodes";
 import { NameSymbol, SymbolFlags, SymbolTable } from "../symbol";
 import { TextToken } from "../parser/tokens";
-import { getVarDocAnnotation, isDocComment } from "./doc_comments";
 
 export const buildingNamePattern = /^([a-z]+)(\d+)$/;
 
@@ -52,6 +52,23 @@ export function getSymbolTable(nodes: SyntaxNode[]) {
     }
   }
 
+  const annotatedVariables = new Set<string>();
+  for (const node of nodes) {
+    if (!(node instanceof CommentLine)) continue;
+    if (!node.docAnnotation) continue;
+
+    const { variableName, kind } = node.docAnnotation;
+
+    // ensure a variable annotated with @local
+    // isn't declared by @external later on
+    if (annotatedVariables.has(variableName)) continue;
+    annotatedVariables.add(variableName);
+
+    if (kind !== "external" || table.has(variableName)) continue;
+
+    table.insert(new NameSymbol(variableName, SymbolFlags.writeable));
+  }
+
   return table;
 }
 
@@ -73,17 +90,17 @@ export function findVariableUsageLocations(
 ) {
   const locations: Range[] = [];
   for (const node of nodes) {
-    if (isDocComment(node)) {
-      const data = getVarDocAnnotation(node);
-      if (data?.variableName !== variable) continue;
+    if (node instanceof CommentLine && node.docAnnotation) {
+      const { variableName, variableStart, annotationEnd } = node.docAnnotation;
+      if (variableName !== variable) continue;
 
       const base = node.trailingComment.start.character;
       locations.push(
         Range.create(
           node.start.line,
-          base + data.variableStart,
+          base + variableStart,
           node.end.line,
-          base + data.annotationEnd
+          base + annotationEnd
         )
       );
     }
@@ -117,6 +134,23 @@ export function findVariableWriteLocations(
           locations.push(param.token);
         }
       }
+    }
+
+    if (node instanceof CommentLine && node.docAnnotation) {
+      const { kind, variableName, variableStart, annotationEnd } =
+        node.docAnnotation;
+      if (variableName !== variable) continue;
+      if (kind !== "external") continue;
+
+      const base = node.trailingComment.start.character;
+      locations.push(
+        Range.create(
+          node.start.line,
+          base + variableStart,
+          node.end.line,
+          base + annotationEnd
+        )
+      );
     }
   }
 

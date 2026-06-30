@@ -12,7 +12,7 @@ repository:
   doc_comment:
     patterns:
       - name: comment.block.documentation.mlog
-        match: (##)\s*(@var)\s+([^\s#;]+).*$
+        match: (##)\s*(@local|@external)\s+([^\s#;]+).*$
         captures:
           1:
             name: punctuation.definition.comment.mlog

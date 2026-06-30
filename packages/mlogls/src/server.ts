@@ -75,7 +75,7 @@ import {
   validateVariableUsage,
 } from "./analysis/validation";
 import { CompletionContext, TokenSemanticData } from "./analysis/types";
-import { getVarDocAnnotation, isDocComment } from "./analysis/doc_comments";
+import { isDocComment } from "./analysis/doc_comments";
 
 export interface LanguageServerOptions {
   connection: Connection;
@@ -989,14 +989,13 @@ export function startServer(options: LanguageServerOptions) {
       };
     }
 
-    if (isDocComment(node)) {
-      const data = getVarDocAnnotation(node);
-      if (!data) return;
+    if (isDocComment(node) && node.docAnnotation) {
+      const { variableName, variableStart, annotationEnd } = node.docAnnotation;
 
       const offset = position.character - node.start.character;
-      if (offset < data.variableStart || offset > data.annotationEnd) return;
+      if (offset < variableStart || offset > annotationEnd) return;
 
-      return findVariableWriteLocations(data.variableName, doc.nodes).map(
+      return findVariableWriteLocations(variableName, doc.nodes).map(
         (location) => ({
           uri: params.textDocument.uri,
           range: location,
@@ -1053,14 +1052,13 @@ export function startServer(options: LanguageServerOptions) {
       }));
     }
 
-    if (isDocComment(node)) {
-      const data = getVarDocAnnotation(node);
-      if (!data) return;
+    if (isDocComment(node) && node.docAnnotation) {
+      const { variableName, variableStart, annotationEnd } = node.docAnnotation;
 
       const offset = position.character - node.start.character;
-      if (offset < data.variableStart || offset > data.annotationEnd) return;
+      if (offset < variableStart || offset > annotationEnd) return;
 
-      return findVariableUsageLocations(data.variableName, doc.nodes).map(
+      return findVariableUsageLocations(variableName, doc.nodes).map(
         (location) => ({
           uri: params.textDocument.uri,
           range: location,
@@ -1117,17 +1115,13 @@ export function startServer(options: LanguageServerOptions) {
       };
     }
 
-    if (isDocComment(node)) {
-      const data = getVarDocAnnotation(node);
-      if (!data) return;
+    if (isDocComment(node) && node.docAnnotation) {
+      const { variableName, variableStart, annotationEnd } = node.docAnnotation;
 
       const offset = position.character - node.start.character;
-      if (offset < data.variableStart || offset > data.annotationEnd) return;
+      if (offset < variableStart || offset > annotationEnd) return;
 
-      const locations = findVariableUsageLocations(
-        data.variableName,
-        doc.nodes
-      );
+      const locations = findVariableUsageLocations(variableName, doc.nodes);
 
       return {
         changes: {
@@ -1196,21 +1190,20 @@ export function startServer(options: LanguageServerOptions) {
       };
     }
 
-    if (isDocComment(node)) {
-      const data = getVarDocAnnotation(node);
-      if (!data) return;
+    if (isDocComment(node) && node.docAnnotation) {
+      const { variableName, variableStart, annotationEnd } = node.docAnnotation;
 
       const offset = position.character - node.start.character;
-      if (offset < data.variableStart || offset > data.annotationEnd) return;
+      if (offset < variableStart || offset > annotationEnd) return;
 
       return {
         range: Range.create(
           node.start.line,
-          node.start.character + data.variableStart,
+          node.start.character + variableStart,
           node.start.line,
-          node.start.character + data.annotationEnd
+          node.start.character + annotationEnd
         ),
-        placeholder: data.variableName,
+        placeholder: variableName,
       };
     }
 

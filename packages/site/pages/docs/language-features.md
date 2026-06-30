@@ -104,10 +104,10 @@ findUnit:
    # ...
 ```
 
-On the other hand, variable documentation comments can be placed anywhere in the file, since they already declare which variable is being annotated.
+On the other hand, variable documentation comments can be placed anywhere in the file, since they already declare which variable is being annotated. Use `@local` to annotate a variable.
 
 ```mlog
-## @var x This is a documentation comment for x
+## @local x This is a documentation comment for x
 ## using **markdown** syntax.
 
 # this variable is not annotated
@@ -118,6 +118,15 @@ set unrelatedVariable 0
 This design choice was made because many mlog instructions have multiple output
 parameters, so using the same mechanism as labels would result in ambiguous comments.
 :::
+
+To declare a variable and (optionally) annotate it, you can use the `@external` tag.
+
+```mlog
+## @external address Return address set by another processor
+
+# no 'undefined-variable' warning is emitted
+print address
+```
 
 Documentation comments must be contiguous, and in the case of labels they must also be placed immediately before them.
 
@@ -135,7 +144,7 @@ label_1:
 label_2:
 
 
-## @var x This annotates x
+## @local x This annotates x
 ##
 ## This is also part of x's annotation
 
@@ -144,11 +153,11 @@ label_2:
 
 ### Mixing Label and Variable documentation
 
-You can place variable documentation comments at the bottom of a label's doc comment block. This is especially useful for documenting variables that are scoped or initialized right after a label. The label will parse the documentation up to the first `@var` annotation, and the variable will capture its respective annotation.
+You can place variable documentation comments at the bottom of a label's doc comment block. This is especially useful for documenting variables that are scoped or initialized right after a label. The label will parse the documentation up to the first `@local` or `@external` annotation, and the variable will capture its respective annotation.
 
 ```mlog
 ## Computes the factorial of a number
-## @var factorial.result The final output of the computation
+## @local factorial.result The final output of the computation
 factorial:
    set factorial.result 1
 ```

@@ -37,7 +37,7 @@ export function getDocTextForLabel(
   for (let i = commentStart; i < commentEnd; i++) {
     const node = nodes[i] as CommentLine;
 
-    if (getVarDocAnnotation(node)) break;
+    if (node.docAnnotation) break;
 
     docText += getDocCommentContent(node) + "\n";
   }
@@ -66,9 +66,12 @@ function getMinimumLabelHeaderStart(
   return index;
 }
 
-const varDocPrefix = /^##\s*@var\s+([^\s#;]+)/;
+const varDocPrefix = /^##\s*@(local|external)\s+([^\s#;]+)/;
+
+export type VarDocKind = "local" | "external";
 
 export interface VarDocData {
+  kind: VarDocKind;
   variableName: string;
   /** The start position of the variable name relative to the token's content */
   variableStart: number;
@@ -84,11 +87,13 @@ export function getVarDocAnnotation(node: CommentLine): VarDocData | undefined {
   const match = content.match(varDocPrefix);
   if (!match) return;
 
-  const name = match[1];
+  const kind = match[1] as VarDocKind;
+  const name = match[2];
   const annotationEnd = match.index! + match[0].length;
   const variableStart = annotationEnd - name.length;
 
   return {
+    kind,
     variableName: name,
     annotationEnd,
     variableStart,
@@ -104,7 +109,7 @@ export function getDocTextForVariable(
   for (let i = 0; i < nodes.length; i++) {
     const node = nodes[i];
     if (!(node instanceof CommentLine)) continue;
-    const data = getVarDocAnnotation(node);
+    const data = node.docAnnotation;
     if (!data || data.variableName !== variableName) continue;
     start = i;
     break;
@@ -116,7 +121,7 @@ export function getDocTextForVariable(
 
   for (let i = start; i < commentEnd; i++) {
     const node = nodes[i] as CommentLine;
-    const data = getVarDocAnnotation(node);
+    const data = node.docAnnotation;
 
     const content = node.trailingComment.content;
     docText += data
@@ -166,7 +171,7 @@ function getVarDocCommentEnd(nodes: SyntaxNode[], start: number) {
     if (!isDocComment(node)) break;
     expectedLineNumber++;
 
-    const data = getVarDocAnnotation(node);
+    const data = node.docAnnotation;
     if (data) break;
 
     commentEnd = i + 1;
