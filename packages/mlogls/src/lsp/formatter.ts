@@ -1,6 +1,6 @@
-import { AnalysisUnit } from "./analysis/analysis_unit";
-import { LogicalScope } from "./analysis/logical_scope";
-import { CommentLine, SyntaxNode } from "./parser/nodes";
+import { AnalysisUnit } from "../analysis/analysis_unit";
+import { LogicalScope } from "../analysis/logical_scope";
+import { CommentLine, SyntaxNode } from "../parser/nodes";
 
 export interface FormatOptions {
   unit: AnalysisUnit;

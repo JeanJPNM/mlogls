@@ -1,5 +1,5 @@
 import { Diagnostic, DiagnosticSeverity, Range } from "vscode-languageserver";
-import { DiagnosticCode } from "../protocol";
+import { DiagnosticCode } from "../lsp/protocol";
 import {
   ColorLiteralToken,
   CommentToken,

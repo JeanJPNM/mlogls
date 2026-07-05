@@ -14,8 +14,8 @@ import {
   teams,
   units,
   weatherNames,
-} from "./constants";
-import { parseColor } from "./parser/tokens";
+} from "../constants";
+import { parseColor } from "../parser/tokens";
 
 export enum SymbolFlags {
   none = 0,

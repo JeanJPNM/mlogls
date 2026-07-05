@@ -1,5 +1,5 @@
 import { SyntaxNode } from "../parser/nodes";
-import { SymbolTable } from "../symbol";
+import { SymbolTable } from "./symbol";
 import { getLogicalScopes, LogicalScope } from "./logical_scope";
 import { getSymbolTable } from "./symbol_resolution";
 

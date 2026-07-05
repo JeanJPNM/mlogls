@@ -18,7 +18,7 @@ import {
   createSpellingAction,
   DiagnosticCode,
   TokenTypes,
-} from "../protocol";
+} from "../lsp/protocol";
 import {
   createOverloadDescriptor,
   createSingleDescriptor,
@@ -42,7 +42,7 @@ import {
   TextToken,
 } from "./tokens";
 import { getSpellingSuggestionForName } from "../util/spelling";
-import { DiagnosingContext } from "../diagnosing_context";
+import { DiagnosingContext } from "../analysis/diagnosing_context";
 import { getLabelNames } from "../analysis/symbol_resolution";
 import { CompletionContext, TokenSemanticData } from "../analysis/types";
 import {

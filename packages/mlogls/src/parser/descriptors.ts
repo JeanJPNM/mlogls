@@ -17,12 +17,12 @@ import {
   DiagnosticCode,
   TokenModifiers,
   TokenTypes,
-} from "../protocol";
+} from "../lsp/protocol";
 import { TextToken } from "./tokens";
-import { SymbolTable } from "../symbol";
+import { SymbolTable } from "../analysis/symbol";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { ignoreToken } from "../constants";
-import { DiagnosingContext } from "../diagnosing_context";
+import { DiagnosingContext } from "../analysis/diagnosing_context";
 import { CompletionContext, TokenSemanticData } from "../analysis/types";
 import {
   getDocTextForLabel,

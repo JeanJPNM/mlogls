@@ -6,7 +6,7 @@ import {
 import {
   DiagnosingContext,
   DiagnosticSuppressionInfo,
-} from "../diagnosing_context";
+} from "./diagnosing_context";
 import { CommentLine, SyntaxNode } from "../parser/nodes";
 import { ParserDiagnostic } from "../parser/tokenize";
 import {
@@ -14,7 +14,7 @@ import {
   DiagnosticDirectiveItem,
   DiagnosticDirectiveScope,
 } from "../parser/tokens";
-import { DiagnosticCode } from "../protocol";
+import { DiagnosticCode } from "../lsp/protocol";
 import { LogicalScope } from "./logical_scope";
 import { AnalysisUnit } from "./analysis_unit";
 

@@ -4,7 +4,7 @@ import {
   DiagnosticCode,
   isDiagnosticCode,
   isIgnorableDiagnosticCode,
-} from "../protocol";
+} from "../lsp/protocol";
 
 export class ParserPosition implements Position {
   constructor(

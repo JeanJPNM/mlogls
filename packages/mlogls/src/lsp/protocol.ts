@@ -114,37 +114,33 @@ export enum CommandCode {
 }
 
 export interface CommandHandlerMap {
-  [CommandCode.useJumpLabels](
-    textDocument: TextDocumentIdentifier
-  ): Promise<void>;
-  [CommandCode.useJumpIndexes](
-    textDocument: TextDocumentIdentifier
-  ): Promise<void>;
+  [CommandCode.useJumpLabels](textDocument: TextDocumentIdentifier): void;
+  [CommandCode.useJumpIndexes](textDocument: TextDocumentIdentifier): void;
   [CommandCode.convertToColorLiteral](
     textDocument: TextDocumentIdentifier,
     position: Position
-  ): Promise<void>;
+  ): void;
 
   [CommandCode.convertToPackColor](
     textDocument: TextDocumentIdentifier,
     position: Position
-  ): Promise<void>;
+  ): void;
   [CommandCode.removeAllUnusedParameters](
     textDocument: TextDocumentIdentifier
-  ): Promise<void>;
+  ): void;
   [CommandCode.disableDiagnosticForLine](
     textDocument: TextDocumentIdentifier,
     position: Position,
     code: string | number | undefined
-  ): Promise<void>;
+  ): void;
   [CommandCode.disableDiagnosticForFile](
     textDocument: TextDocumentIdentifier,
     code: string | number | undefined
-  ): Promise<void>;
+  ): void;
   [CommandCode.removeDiagnosticDirective](
     textDocument: TextDocumentIdentifier,
     position: Position
-  ): Promise<void>;
+  ): void;
 }
 
 type CreateCommandActionOptions<C extends CommandCode> = Omit<

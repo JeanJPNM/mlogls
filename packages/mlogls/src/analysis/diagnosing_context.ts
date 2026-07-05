@@ -1,8 +1,8 @@
 import { DiagnosticSeverity, Range } from "vscode-languageserver";
-import { ParserDiagnostic } from "./parser/tokenize";
-import { DiagnosticDirectiveItem } from "./parser/tokens";
-import { DiagnosticCode } from "./protocol";
-import { SyntaxNode } from "./parser/nodes";
+import { ParserDiagnostic } from "../parser/tokenize";
+import { DiagnosticDirectiveItem } from "../parser/tokens";
+import { DiagnosticCode } from "../lsp/protocol";
+import { SyntaxNode } from "../parser/nodes";
 
 export interface DiagnosticSuppressionInfo {
   /**

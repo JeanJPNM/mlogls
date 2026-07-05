@@ -1,12 +1,12 @@
 import { DiagnosticSeverity, DiagnosticTag } from "vscode-languageserver";
 import { ignoreToken, maxLabelCount } from "../constants";
-import { DiagnosingContext } from "../diagnosing_context";
+import { DiagnosingContext } from "./diagnosing_context";
 import {
   InstructionNode,
   JumpInstruction,
   LabelDeclaration,
 } from "../parser/nodes";
-import { DiagnosticCode } from "../protocol";
+import { DiagnosticCode } from "../lsp/protocol";
 import { getSpellingSuggestionForName } from "../util/spelling";
 import { ParameterType, ParameterUsage } from "../parser/descriptors";
 import { AnalysisUnit } from "./analysis_unit";

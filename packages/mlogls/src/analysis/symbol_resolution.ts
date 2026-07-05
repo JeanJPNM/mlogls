@@ -8,7 +8,7 @@ import {
   LabelDeclaration,
   SyntaxNode,
 } from "../parser/nodes";
-import { NameSymbol, SymbolFlags, SymbolTable } from "../symbol";
+import { NameSymbol, SymbolFlags, SymbolTable } from "./symbol";
 import { TextToken } from "../parser/tokens";
 
 export const buildingNamePattern = /^([a-z]+)(\d+)$/;
