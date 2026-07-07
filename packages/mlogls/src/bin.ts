@@ -13,17 +13,14 @@ yargs(hideBin(process.argv))
         .option("stdio", {
           type: "boolean",
           desc: "Use stdio for communication",
-          default: true,
         })
         .option("node-ipc", {
           type: "boolean",
           desc: "Use node-ipc for communication",
-          default: false,
         })
         .option("socket", {
           type: "number",
           desc: "The socket port to use for socket communication",
-          demandOption: false,
         })
         .option("pipe", {
           type: "string",
@@ -32,18 +29,22 @@ yargs(hideBin(process.argv))
         .option("clientProcessId", {
           type: "number",
           desc: "The process id of the parent process",
+        })
+        .conflicts("stdio", ["node-ipc", "socket", "pipe"])
+        .conflicts("node-ipc", ["stdio", "socket", "pipe"])
+        .conflicts("socket", ["stdio", "node-ipc", "pipe"])
+        .conflicts("pipe", ["stdio", "node-ipc", "socket"])
+        .check((argv) => {
+          if (argv.stdio || argv["node-ipc"] || argv.socket || argv.pipe) {
+            return true;
+          }
+          throw new Error(
+            "You must specify one of --stdio, --node-ipc, --socket, or --pipe"
+          );
         });
     },
     (args) => {
-      // the language server package already
-      // detects the communication method based on the
-      // arguments passed to the process
-      //
-      // we are doing this check because we are setting
-      // stdio as the default method
-      const connection = args.stdio
-        ? createConnection(ProposedFeatures.all, process.stdin, process.stdout)
-        : createConnection(ProposedFeatures.all);
+      const connection = createConnection(ProposedFeatures.all);
 
       // TODO: the svelte language server does this
       // is it enough though?
