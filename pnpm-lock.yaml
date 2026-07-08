@@ -38,6 +38,9 @@ importers:
 
   packages/mlogls:
     dependencies:
+      picocolors:
+        specifier: ^1.1.1
+        version: 1.1.1
       vscode-languageserver:
         specifier: ^9.0.1
         version: 9.0.1
