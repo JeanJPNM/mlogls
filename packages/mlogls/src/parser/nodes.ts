@@ -2468,6 +2468,27 @@ export class PlaySoundInstruction extends InstructionNode<
     return new PlaySoundInstruction(line, ...data);
   }
 }
+
+export class PlayMusicInstruction extends InstructionNode<
+  DataOf<typeof PlayMusicInstruction>
+> {
+  descriptor = PlayMusicInstruction.descriptor;
+
+  static readonly descriptor = createSingleDescriptor({
+    name: "playmusic",
+    descriptor: {
+      name: {},
+      interrupt: {},
+    },
+  });
+
+  static parse(this: void, line: TokenLine) {
+    const data = PlayMusicInstruction.descriptor.parse(line.tokens);
+
+    return new PlayMusicInstruction(line, ...data);
+  }
+}
+
 export class SetMarkerInstruction extends InstructionNode<
   DataOf<typeof SetMarkerInstruction>
 > {
@@ -2627,6 +2648,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   setflag: SetFlagInstruction.parse,
   setprop: SetPropInstruction.parse,
   playsound: PlaySoundInstruction.parse,
+  playmusic: PlayMusicInstruction.parse,
   setmarker: SetMarkerInstruction.parse,
   makemarker: MakeMakerInstruction.parse,
   printlocale: PrintLocaleInstruction.parse,

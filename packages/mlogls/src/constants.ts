@@ -33,6 +33,7 @@ export const globalReadonlyVariables = [
   "@clientName",
   "@clientTeam",
   "@clientMobile",
+  "@clientMusicPlaying",
   "@ctrlPlayer",
   "@ctrlProcessor",
   "@ctrlCommand",
