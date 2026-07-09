@@ -665,6 +665,7 @@ export const sensors = [
   "@team",
   "@type",
   "@flag",
+  "@flying",
   "@controlled",
   "@controller",
   "@name",
