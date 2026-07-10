@@ -52,6 +52,6 @@
   },
   "type": "module",
   "devDependencies": {
-    "@types/yargs": "^17.0.33"
+    "@types/yargs": "^17.0.35"
   }
 }
