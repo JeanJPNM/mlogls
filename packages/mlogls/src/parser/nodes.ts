@@ -219,7 +219,7 @@ export class CommentLine extends SyntaxNode {
   }
 
   get trailingComment(): CommentToken {
-    return this.line.tokens[0] as CommentToken;
+    return this.line.tokens[0];
   }
 
   get diagnosticDirective(): DiagnosticDirective | undefined {
