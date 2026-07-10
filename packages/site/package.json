@@ -30,7 +30,7 @@
     "fflate": "^0.8.3",
     "js-yaml": "^5.2.1",
     "mlogls": "workspace:^",
-    "vite": "^7.1.7",
+    "vite": "^8.1.4",
     "vitepress": "^1.6.4",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1",
