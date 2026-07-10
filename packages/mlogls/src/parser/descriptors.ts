@@ -347,12 +347,10 @@ export function createOverloadDescriptor<
 
         if (!param.restrict) return context.getVariableCompletions();
 
-        return param.restrict.values.map(
-          (value): CompletionItem => ({
-            label: value,
-            kind: restrictedTokenCompletionKind,
-          })
-        );
+        return param.restrict.values.map((value): CompletionItem => ({
+          label: value,
+          kind: restrictedTokenCompletionKind,
+        }));
       }
 
       return context.getVariableCompletions();
@@ -661,12 +659,10 @@ function provideMemberCompletions<T extends SingleDescriptor>(
 
     if (!param.restrict) return context.getVariableCompletions();
 
-    return param.restrict.values.map(
-      (value): CompletionItem => ({
-        label: value,
-        kind: restrictedTokenCompletionKind,
-      })
-    );
+    return param.restrict.values.map((value): CompletionItem => ({
+      label: value,
+      kind: restrictedTokenCompletionKind,
+    }));
   }
 
   return context.getVariableCompletions();
@@ -724,12 +720,10 @@ export function getTargetParameter(
 function overloadCompletionItems<const T extends Record<string, unknown>>(
   descriptor: T
 ) {
-  return Object.keys(descriptor).map(
-    (type): CompletionItem => ({
-      label: type,
-      kind: restrictedTokenCompletionKind,
-    })
-  );
+  return Object.keys(descriptor).map((type): CompletionItem => ({
+    label: type,
+    kind: restrictedTokenCompletionKind,
+  }));
 }
 
 export function validateRestrictedToken(
