@@ -25,7 +25,7 @@
     "@lezer/highlight": "^1.2.3",
     "@lezer/lr": "^1.4.10",
     "@types/js-yaml": "^4.0.9",
-    "@uiw/codemirror-theme-vscode": "^4.25.10",
+    "@uiw/codemirror-theme-vscode": "^4.25.11",
     "codemirror": "^6.0.2",
     "fflate": "^0.8.2",
     "js-yaml": "^5.2.1",
