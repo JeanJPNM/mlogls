@@ -27,7 +27,7 @@
     "@types/js-yaml": "^4.0.9",
     "@uiw/codemirror-theme-vscode": "^4.25.11",
     "codemirror": "^6.0.2",
-    "fflate": "^0.8.2",
+    "fflate": "^0.8.3",
     "js-yaml": "^5.2.1",
     "mlogls": "workspace:^",
     "vite": "^7.1.7",
