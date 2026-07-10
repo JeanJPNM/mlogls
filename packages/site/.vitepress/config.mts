@@ -2,7 +2,7 @@ import { lezer } from "@lezer/generator/rollup";
 import path from "node:path";
 import { defineConfig } from "vitepress";
 import fs from "node:fs/promises";
-import jsYaml from "js-yaml";
+import * as jsYaml from "js-yaml";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({

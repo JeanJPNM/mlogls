@@ -1,7 +1,7 @@
 // @ts-check
 import * as esbuild from "esbuild";
 import chokidar from "chokidar";
-import jsYaml from "js-yaml";
+import * as jsYaml from "js-yaml";
 import * as fs from "node:fs/promises";
 
 const syntaxDir = "syntaxes";
@@ -73,7 +73,6 @@ async function buildLanguageSyntax(syntaxFile) {
   try {
     const json = jsYaml.load(yaml, {
       filename: syntaxFile,
-      onWarning: console.warn,
     });
 
     const jsonPath = syntaxFile.replace(/\.yaml$/, ".json");

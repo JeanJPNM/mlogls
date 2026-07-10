@@ -64,8 +64,8 @@ importers:
         specifier: ^4.0.3
         version: 4.0.3
       js-yaml:
-        specifier: ^4.1.0
-        version: 4.1.0
+        specifier: ^5.2.1
+        version: 5.2.1
       mlogls:
         specifier: workspace:^
         version: link:../mlogls
@@ -124,8 +124,8 @@ importers:
         specifier: ^0.8.2
         version: 0.8.2
       js-yaml:
-        specifier: ^4.1.0
-        version: 4.1.0
+        specifier: ^5.2.1
+        version: 5.2.1
       mlogls:
         specifier: workspace:^
         version: link:../mlogls
@@ -1374,8 +1374,12 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  js-yaml@4.1.0:
-    resolution: {integrity: sha512-wpxZs9NoxZaJESJGIZTyDEaYpl0FKSA+FB9aJiyemKhMwkxQg63h4T1KJgUGHpTqPDNRcmmYLugrRjJlBtWvRA==}
+  js-yaml@4.3.0:
+    resolution: {integrity: sha512-1td788aAnnZ5qs7V2QIRl1owjtYpbKt749Y3xauqQgwIIGF/xXWz1wMTEBx5O3LK3lXLVuqXPdPxj2BoFHaW9Q==}
+    hasBin: true
+
+  js-yaml@5.2.1:
+    resolution: {integrity: sha512-zfLtNfQqxVqq3uaTqSkh4x4hZw3KHobGUA0fJUj4wawW8bsQLTVqpHdXSIzidh7o+4lEW36tANuAGdaFx6Zgnw==}
     hasBin: true
 
   json-buffer@3.0.1:
@@ -2280,7 +2284,7 @@ snapshots:
       globals: 14.0.0
       ignore: 5.3.2
       import-fresh: 3.3.1
-      js-yaml: 4.1.0
+      js-yaml: 4.3.0
       minimatch: 3.1.2
       strip-json-comments: 3.1.1
     transitivePeerDependencies:
@@ -3100,7 +3104,11 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  js-yaml@4.1.0:
+  js-yaml@4.3.0:
+    dependencies:
+      argparse: 2.0.1
+
+  js-yaml@5.2.1:
     dependencies:
       argparse: 2.0.1
 

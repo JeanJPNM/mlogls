@@ -73,7 +73,7 @@
   "devDependencies": {
     "@types/vscode": "^1.75.0",
     "chokidar": "^4.0.3",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "^5.2.1",
     "mlogls": "workspace:^",
     "vscode-languageclient": "^9.0.1",
     "vscode-languageserver": "^9.0.1"
