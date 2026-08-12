@@ -7,9 +7,8 @@
   "engines": {
     "node": ">=16"
   },
-  "bin": "./dist/bin.cjs",
-  "main": "dist/server.cjs",
-  "module": "dist/server.js",
+  "bin": "./dist/bin.js",
+  "main": "dist/server.js",
   "types": "dist/server.d.ts",
   "scripts": {
     "build": "node build.js && tsc --emitDeclarationOnly",
@@ -17,10 +16,8 @@
   },
   "exports": {
     ".": {
-      "node": "./dist/server.cjs",
-      "import": "./dist/server.js",
       "types": "./dist/server.d.ts",
-      "require": "./dist/server.cjs"
+      "default": "./dist/server.js"
     }
   },
   "homepage": "https://github.com/JeanJPNM/mlogls#readme",
