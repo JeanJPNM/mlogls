@@ -7,14 +7,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@types/node": "^20.5.7",
-    "esbuild": "^0.28.1",
-    "eslint": "^10.6.0",
+    "@types/node": "^20.19.43",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.8.1",
     "eslint-config-prettier": "^10.1.8",
-    "globals": "^17.7.0",
-    "prettier": "3.9.5",
+    "globals": "^17.11.0",
+    "prettier": "3.9.6",
     "prettier-plugin-jsdoc": "1.8.1",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.63.0"
+    "typescript-eslint": "^8.67.0"
   }
 }
