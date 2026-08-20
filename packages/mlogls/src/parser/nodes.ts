@@ -26,12 +26,14 @@ import {
   getTargetToken,
   InstructionDescriptor,
   InstructionParameter,
+  ParameterType,
   ParameterUsage,
 } from "./descriptors";
 import {
   colorData,
   counterVar,
   ignoreToken,
+  statusEffects,
   stringTemplatePattern,
   waitVar,
 } from "../constants";
@@ -1651,6 +1653,7 @@ export class SpawnUnitInstruction extends InstructionNode<
       rotation: {},
       team: {},
       result: { isOutput: true },
+      effect: {},
     },
   });
 
@@ -1732,30 +1735,6 @@ export class SetWeatherInstruction extends InstructionNode<
   }
 }
 
-const applyStatusEffects = [
-  "burning",
-  "freezing",
-  "unmoving",
-  "slow",
-  "fast",
-  "wet",
-  "muddy",
-  "melting",
-  "sapped",
-  "tarred",
-  "overclock",
-  "shielded",
-  "shocked",
-  "blasted",
-  "corroded",
-  "spore-slowed",
-  "disarmed",
-  "electrified",
-  "invincible",
-  "boss",
-  "overdrive",
-] as const;
-
 export class ApplyStatusInstruction extends InstructionNode<
   DataOf<typeof ApplyStatusInstruction>
 > {
@@ -1766,23 +1745,13 @@ export class ApplyStatusInstruction extends InstructionNode<
     overloads: {
       // clear status effect
       true: {
-        effect: {
-          restrict: {
-            values: applyStatusEffects,
-            invalidPrefix: "Invalid status effect: ",
-          },
-        },
+        effect: {},
         unit: {},
       },
 
       // apply status effect
       false: {
-        effect: {
-          restrict: {
-            values: applyStatusEffects,
-            invalidPrefix: "Invalid status effect: ",
-          },
-        },
+        effect: {},
         unit: {},
         duration: {},
       },
@@ -1790,9 +1759,13 @@ export class ApplyStatusInstruction extends InstructionNode<
   });
 
   static parse(this: void, line: TokenLine) {
-    const data = ApplyStatusInstruction.descriptor.parse(line.tokens);
+    const [data, params] = ApplyStatusInstruction.descriptor.parse(line.tokens);
 
-    return new ApplyStatusInstruction(line, ...data);
+    if (data.effect && statusEffects.includes(data.effect.content)) {
+      params[1].type = ParameterType.enumMember;
+    }
+
+    return new ApplyStatusInstruction(line, data, params);
   }
 }
 
@@ -1857,6 +1830,9 @@ export class SetRuleInstruction extends InstructionNode<
       },
       unitCap: {
         amount: {},
+      },
+      musicVolume: {
+        value: {},
       },
       mapArea: {
         _: {},
@@ -1984,6 +1960,9 @@ export class CutsceneInstruction extends InstructionNode<
   static readonly descriptor = createOverloadDescriptor({
     name: "cutscene",
     overloads: {
+      active: {
+        result: { isOutput: true },
+      },
       pan: {
         x: {},
         y: {},
@@ -1993,6 +1972,16 @@ export class CutsceneInstruction extends InstructionNode<
         level: {},
       },
       stop: {},
+      shake: {
+        intensity: {},
+        duration: {},
+      },
+      getHud: {
+        result: { isOutput: true },
+      },
+      setHud: {
+        shown: {},
+      },
     },
   });
 

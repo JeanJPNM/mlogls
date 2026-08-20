@@ -11,6 +11,7 @@ import {
   mathConstants,
   sensors,
   soundNames,
+  statusEffects,
   teams,
   units,
   weatherNames,
@@ -62,6 +63,7 @@ export const builtInSymbols = [
   ...sensors.map(makeGlobal),
   ...units.map(makeGlobal),
   ...soundNames.map(makeGlobal),
+  ...statusEffects.map(makeStatusEffectGlobal),
   ...weatherNames.map(makeGlobal),
 ];
 
@@ -126,4 +128,8 @@ function makeColorGlobal(name: string) {
   const globalName = makeColorVarName(name);
 
   return new NameSymbol(globalName, SymbolFlags.global, color);
+}
+
+function makeStatusEffectGlobal(name: string) {
+  return new NameSymbol(`@status-${name}`, SymbolFlags.global);
 }

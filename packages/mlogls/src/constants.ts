@@ -34,6 +34,7 @@ export const globalReadonlyVariables = [
   "@clientTeam",
   "@clientMobile",
   "@clientMusicPlaying",
+  "@clientCurrentMusic",
   "@ctrlPlayer",
   "@ctrlProcessor",
   "@ctrlCommand",
@@ -961,6 +962,31 @@ export const soundNames = [
   "@sfx-windHowl",
   "@sfx-wreckFall",
   "@sfx-wreckFallBig",
+];
+
+export const statusEffects = [
+  "boss",
+  "burning",
+  "corroded",
+  "disarmed",
+  "dynamic",
+  "electrified",
+  "fast",
+  "freezing",
+  "invincible",
+  "melting",
+  "muddy",
+  "none",
+  "overclock",
+  "overdrive",
+  "sapped",
+  "shielded",
+  "shocked",
+  "slow",
+  "spore",
+  "tarred",
+  "unmoving",
+  "wet",
 ];
 
 export const weatherNames = [
