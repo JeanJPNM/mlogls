@@ -3,7 +3,7 @@ import {
   Diagnostic,
   DiagnosticSeverity,
   ProposedFeatures,
-} from "vscode-languageserver/node";
+} from "vscode-languageserver/node.js";
 import { startServer } from "./server";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
