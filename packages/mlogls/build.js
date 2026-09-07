@@ -26,6 +26,9 @@ const contexts = await Promise.all([
     entryPoints: ["src/bin.ts"],
     target: "es2020",
     format: "esm",
+    banner: {
+      js: "#!/usr/bin/env node",
+    },
   }),
 ]);
 
