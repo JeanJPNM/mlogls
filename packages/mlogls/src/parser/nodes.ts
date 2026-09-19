@@ -148,6 +148,19 @@ export abstract class SyntaxNode {
           severity: DiagnosticSeverity.Warning,
           code: DiagnosticCode.unknownColorName,
         });
+      } else if (
+        (token.content === "config" || token.content === "@config") &&
+        token.end.character - token.start.character !== token.content.length
+      ) {
+        context.addDiagnostic(nodeIndex, {
+          message:
+            token.content === "config"
+              ? "Mindustry parses 'configure' as 'config'. Use 'config' instead "
+              : "Mindustry parses '@configure' as '@config'. Use '@config' instead.",
+          code: DiagnosticCode.automaticRename,
+          severity: DiagnosticSeverity.Warning,
+          range: token,
+        });
       }
     }
   }
@@ -169,6 +182,32 @@ export abstract class SyntaxNode {
     diagnostic: Diagnostic,
     actions: (CodeAction | Command)[]
   ): void {
+    handleAutomaticRename: if (
+      diagnostic.code === DiagnosticCode.automaticRename
+    ) {
+      const token = getTargetToken(
+        diagnostic.range.start.character,
+        this.line.tokens
+      );
+
+      if (!token) break handleAutomaticRename;
+
+      if (token.content !== "@config" && token.content !== "config")
+        break handleAutomaticRename;
+
+      actions.push({
+        title: `Replace with '${token.content === "@config" ? "@config" : "config"}'`,
+        kind: CodeActionKind.QuickFix,
+        isPreferred: true,
+        edit: {
+          changes: {
+            [unit.uri]: [TextEdit.replace(diagnostic.range, token.content)],
+          },
+        },
+        diagnostics: [diagnostic],
+      });
+    }
+
     if (diagnostic.code !== DiagnosticCode.unknownColorName) return;
 
     const token = getTargetToken(

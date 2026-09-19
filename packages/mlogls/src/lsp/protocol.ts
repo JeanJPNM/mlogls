@@ -77,6 +77,7 @@ export enum DiagnosticCode {
   labelWithoutInstruction = "label-without-instruction",
   unnecessaryDiagnosticDirective = "unnecessary-diagnostic-directive",
   invalidDiagnosticDirective = "invalid-diagnostic-directive",
+  automaticRename = "automatic-rename",
 }
 
 export const diagnosticCodes = Object.values(DiagnosticCode);

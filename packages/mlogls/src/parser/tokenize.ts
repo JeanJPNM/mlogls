@@ -220,8 +220,9 @@ export function tokenize(chars: string) {
     checkRead();
 
     for (let i = 1; i < tokens.length; i++) {
-      if (tokens[i].content === "@configure") tokens[i].content = "@config";
-      if (tokens[i].content === "configure") tokens[i].content = "config";
+      const token = tokens[i];
+      if (token.content === "@configure") token.content = "@config";
+      if (token.content === "configure") token.content = "config";
     }
 
     lines.push(new TokenLine(start, end, tokens));
