@@ -1711,7 +1711,7 @@ export class SpawnBulletInstruction extends InstructionNode<
   static readonly descriptor = createSingleDescriptor({
     name: "bullet",
     descriptor: {
-      result: {},
+      result: { isOutput: true },
       from: {},
       index: {},
       x: {},
