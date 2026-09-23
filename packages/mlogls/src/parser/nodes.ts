@@ -2608,22 +2608,22 @@ export class MakeMakerInstruction extends InstructionNode<
   }
 }
 
-export class PrintLocaleInstruction extends InstructionNode<
-  DataOf<typeof PrintLocaleInstruction>
+export class LocalePrintInstruction extends InstructionNode<
+  DataOf<typeof LocalePrintInstruction>
 > {
-  descriptor = PrintLocaleInstruction.descriptor;
+  descriptor = LocalePrintInstruction.descriptor;
 
   static readonly descriptor = createSingleDescriptor({
-    name: "printlocale",
+    name: "localeprint",
     descriptor: {
       key: {},
     },
   });
 
   static parse(this: void, line: TokenLine) {
-    const data = PrintLocaleInstruction.descriptor.parse(line.tokens);
+    const data = LocalePrintInstruction.descriptor.parse(line.tokens);
 
-    return new PrintLocaleInstruction(line, ...data);
+    return new LocalePrintInstruction(line, ...data);
   }
 }
 
@@ -2679,7 +2679,7 @@ const instructionParsers: Record<string, (line: TokenLine) => SyntaxNode> = {
   playmusic: PlayMusicInstruction.parse,
   setmarker: SetMarkerInstruction.parse,
   makemarker: MakeMakerInstruction.parse,
-  printlocale: PrintLocaleInstruction.parse,
+  localeprint: LocalePrintInstruction.parse,
 };
 
 export function getInstructionNames() {
