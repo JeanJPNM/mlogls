@@ -68,6 +68,14 @@ export class MlogDocument implements TextDocument {
     return this.#document.offsetAt(position);
   }
 
+  getLineRange(line: number): Range {
+    return this.#document.getLineRange(line);
+  }
+
+  getEOLCharacters(line: number): string {
+    return this.#document.getEOLCharacters(line);
+  }
+
   update(changes: TextDocumentContentChangeEvent[], version: number) {
     TextDocument.update(this.#document, changes, version);
 
