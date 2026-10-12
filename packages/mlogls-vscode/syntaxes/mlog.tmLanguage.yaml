@@ -55,17 +55,12 @@ repository:
           1:
             name: keyword.operator.arithmetic.mlog
       - name: constant.numeric.decimal.mlog
-        match: (?<=\s|^)([+-])?\d+(\.\d+)?[fF.]?(?=\s|$|;)
+        match: (?<=\s|^)([+-])?(\d+|\d+\.\d*|\.\d+)([eE][+-]?\d+)?[fF.]?(?=\s|$|;)
         captures:
           1:
             name: keyword.operator.arithmetic.mlog
       - name: constant.numeric.decimal.mlog
-        match: (?<=\s|^)([+-])?\.\d+[fF.]?(?=\s|$|;)
-        captures:
-          1:
-            name: keyword.operator.arithmetic.mlog
-      - name: constant.numeric.decimal.mlog
-        match: (?<=\s|^)([+-])?\d+[Ee][+-]?\d+[fF.]?(?=\s|$|;)
+        match: (?<=\s|^)([+-])?\.([eE][+-]?\d+[fF.]?|[fF.])(?=\s|$|;)
         captures:
           1:
             name: keyword.operator.arithmetic.mlog

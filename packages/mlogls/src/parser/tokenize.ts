@@ -233,7 +233,7 @@ export function tokenize(chars: string) {
 
 const binaryNumberRegex = /^[-+]?0b[01]+$/;
 const hexNumberRegex = /^[-+]?0x[0-9a-fA-F]+$/;
-const decimalNumberRegex = /^[+-]?(\.\d+|\d+(\.\d+)?|\d+[eE][+-]?\d+)[fF.]?$/;
+const decimalNumberRegex = /^[+-]?(\d+|\d*\.\d*)([eE][+-]?\d+)?[fF.]?$/;
 
 function parseNumber(
   content: string,
@@ -260,10 +260,16 @@ function parseNumber(
   if (decimalNumberRegex.test(content)) {
     let end = content.length;
     if (/[fF.]$/.test(content)) end--;
+    if (start >= end) return;
 
     validateDecimalNumber(content, start, end, position, diagnostics);
 
-    return Number(content.slice(0, end));
+    content = content.slice(start, end);
+    if (content[0] === ".") {
+      content = "0" + content;
+    }
+
+    return sign * Number(content);
   }
 }
 
@@ -288,7 +294,35 @@ function validateDecimalNumber(
     }
   }
 
-  if (dot !== -1) {
+  if (dot !== -1 && e !== -1) {
+    validateDecimalComponent(
+      content,
+      start,
+      dot,
+      position,
+      diagnostics,
+      "The integer part of the number"
+    );
+
+    validateDecimalComponent(
+      content,
+      dot + 1,
+      e,
+      position,
+      diagnostics,
+      "The fractional part of the number",
+      18
+    );
+
+    validateDecimalComponent(
+      content,
+      e + 1,
+      end,
+      position,
+      diagnostics,
+      "The exponent of the number"
+    );
+  } else if (dot !== -1) {
     validateDecimalComponent(
       content,
       start,
@@ -304,7 +338,8 @@ function validateDecimalNumber(
       end,
       position,
       diagnostics,
-      "The fractional part of the number"
+      "The fractional part of the number",
+      18
     );
   } else if (e !== -1) {
     validateDecimalComponent(
@@ -368,24 +403,23 @@ function validateDecimalComponent(
   end: number,
   position: ParserPosition,
   diagnostics: ParserDiagnostic[],
-  prefix: string
+  prefix: string,
+  truncateLength?: number
 ): void {
   if (start === end) return;
-  let positive = true;
-  let parseStart = start;
-  if (content[start] === "+" || content[start] === "-") {
-    parseStart++;
-    positive = content[start] === "+";
-  }
 
-  if (!isValidDecimalNumber(content, parseStart, end, positive)) {
-    const message = `${prefix} will not be parsed correctly by the game because it is out of range.`;
+  if (truncateLength !== undefined) {
+    const length = end - start;
+    if (length <= truncateLength) return;
+
+    const message =
+      "Mindustry will ignore these digits when parsing the number. Consider removing them.";
 
     diagnostics.push({
       range: Range.create(
         {
           line: position.line,
-          character: position.character + start,
+          character: position.character + start + truncateLength,
         },
         {
           line: position.line,
@@ -394,7 +428,36 @@ function validateDecimalComponent(
       ),
       message,
       code: DiagnosticCode.outOfRangeValue,
-      severity: DiagnosticSeverity.Error,
+      severity: DiagnosticSeverity.Warning,
     });
+
+    return;
   }
+
+  let positive = true;
+  let parseStart = start;
+  if (content[start] === "+" || content[start] === "-") {
+    parseStart++;
+    positive = content[start] === "+";
+  }
+
+  if (isValidDecimalNumber(content, parseStart, end, positive)) return;
+
+  const message = `${prefix} will not be parsed correctly by the game because it is out of range.`;
+
+  diagnostics.push({
+    range: Range.create(
+      {
+        line: position.line,
+        character: position.character + start,
+      },
+      {
+        line: position.line,
+        character: position.character + end,
+      }
+    ),
+    message,
+    code: DiagnosticCode.outOfRangeValue,
+    severity: DiagnosticSeverity.Error,
+  });
 }
