@@ -1892,6 +1892,9 @@ export class SetRuleInstruction extends InstructionNode<
       ambientLight: {
         color: {},
       },
+      unitLight: {
+        enabled: {},
+      },
       solarMultiplier: {
         multiplier: {},
       },
