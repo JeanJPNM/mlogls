@@ -2531,6 +2531,7 @@ export class SetMarkerInstruction extends InstructionNode<
       remove: { id: {} },
       world: { id: {}, bool: {} },
       minimap: { id: {}, bool: {} },
+      light: { id: {}, bool: {} },
       autoscale: { id: {}, bool: {} },
       pos: { id: {}, x: {}, y: {} },
       endPos: { id: {}, x: {}, y: {} },
@@ -2601,6 +2602,7 @@ export class MakeMakerInstruction extends InstructionNode<
       line: { id: {}, x: {}, y: {}, replace: {} },
       texture: { id: {}, x: {}, y: {}, replace: {} },
       quad: { id: {}, x: {}, y: {}, replace: {} },
+      light: { id: {}, x: {}, y: {}, replace: {} },
     },
   });
 
