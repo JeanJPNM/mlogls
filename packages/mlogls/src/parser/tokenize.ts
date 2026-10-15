@@ -76,7 +76,7 @@ export function tokenize(chars: string) {
     const start = getCurrentLocation();
     const startPos = pos;
     //read until \n or eof
-    while (pos < chars.length && chars[pos] != "\n" && chars[pos] != "\r") {
+    while (pos < chars.length && chars[pos] !== "\n" && chars[pos] !== "\r") {
       pos++;
     }
     const end = getCurrentLocation();
@@ -91,12 +91,12 @@ export function tokenize(chars: string) {
 
     while (++pos < chars.length) {
       const c = chars[pos];
-      if (c == "\n" || c == "\r" || c == '"') {
+      if (c === "\n" || c === "\r" || c === '"') {
         break;
       }
     }
 
-    if (pos >= chars.length || chars[pos] != '"') {
+    if (pos >= chars.length || chars[pos] !== '"') {
       diagnostics.push({
         range: Range.create(start, getCurrentLocation()),
         message: 'Missing closing quote " before end of line.',
@@ -116,12 +116,12 @@ export function tokenize(chars: string) {
     while (pos < chars.length) {
       const c = chars[pos];
       if (
-        c == "\n" ||
-        c == " " ||
-        c == "#" ||
-        c == "\t" ||
-        c == ";" ||
-        c == "\r"
+        c === "\n" ||
+        c === " " ||
+        c === "#" ||
+        c === "\t" ||
+        c === ";" ||
+        c === "\r"
       )
         break;
       pos++;
@@ -165,18 +165,18 @@ export function tokenize(chars: string) {
       const c = chars[pos];
 
       //reached end of line, bail out.
-      if (c == "\n" || c == ";" || c == "\r") break;
+      if (c === "\n" || c === ";" || c === "\r") break;
 
-      if (expectNext && c != " " && c != "#" && c != "\t") {
+      if (expectNext && c !== " " && c !== "#" && c !== "\t") {
         missingSpace = true;
       }
 
       expectNext = false;
 
-      if (c == "#") {
+      if (c === "#") {
         tokens.push(parseComment());
         break;
-      } else if (c == '"') {
+      } else if (c === '"') {
         const token = parseString();
         tokens.push(token);
 
@@ -193,7 +193,7 @@ export function tokenize(chars: string) {
         if (!token.content.endsWith('"')) break;
 
         expectNext = true;
-      } else if (c != " " && c != "\t") {
+      } else if (c !== " " && c !== "\t") {
         const token = parseToken();
         tokens.push(token);
 
