@@ -106,7 +106,7 @@ const docLanguage = StreamLanguage.define({
       return "keyword";
     }
 
-    if (state.phase === 2 && stream.match(/[^\s#;]+/)) {
+    if (state.phase === 2 && stream.match(/[^\s#;"]+/)) {
       state.phase = 3;
       return "variableName";
     }

@@ -78,6 +78,7 @@ export enum DiagnosticCode {
   unnecessaryDiagnosticDirective = "unnecessary-diagnostic-directive",
   invalidDiagnosticDirective = "invalid-diagnostic-directive",
   automaticRename = "automatic-rename",
+  invalidEscapeSequence = "invalid-escape-sequence",
 }
 
 export const diagnosticCodes = Object.values(DiagnosticCode);

@@ -66,7 +66,7 @@ function getMinimumLabelHeaderStart(
   return index;
 }
 
-const varDocPrefix = /^##\s*@(local|external)\s+([^\s#;]+)/;
+const varDocPrefix = /^##\s*@(local|external)\s+([^\s#;"]+)/;
 
 export type VarDocKind = "local" | "external";
 

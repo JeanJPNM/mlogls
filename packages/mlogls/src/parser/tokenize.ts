@@ -94,6 +94,48 @@ export function tokenize(chars: string) {
       if (c === "\n" || c === "\r" || c === '"') {
         break;
       }
+
+      if (c === "\\") {
+        const escaped = chars[pos + 1];
+        if (escaped === '"' || escaped === "\\" || escaped === "u") {
+          pos++; //skip the escaped character
+        }
+
+        if (escaped === "u") {
+          if (pos + 4 >= chars.length) {
+            pos = chars.length; //skip to the end of the line
+            diagnostics.push({
+              range: Range.create(start, getCurrentLocation()),
+              code: DiagnosticCode.invalidEscapeSequence,
+              message:
+                "Invalid unicode escape sequence. Expected 4 hex digits after \\u.",
+            });
+            break;
+          }
+
+          const escapeSequenceStart = pos - 1;
+          let invalidPosition: number | null = null;
+          for (let i = pos + 1; i < pos + 5; i++) {
+            const hexChar = chars[i];
+            if (isNaN(parseInt(hexChar, 16))) {
+              invalidPosition = i;
+              break;
+            }
+          }
+
+          if (invalidPosition !== null) {
+            diagnostics.push({
+              range: Range.create(
+                new ParserPosition(line, escapeSequenceStart - lineStart),
+                new ParserPosition(line, invalidPosition + 1 - lineStart)
+              ),
+              code: DiagnosticCode.invalidEscapeSequence,
+              message:
+                "Invalid unicode escape sequence. Expected 4 hex digits after \\u.",
+            });
+          }
+        }
+      }
     }
 
     if (pos >= chars.length || chars[pos] !== '"') {
@@ -121,7 +163,8 @@ export function tokenize(chars: string) {
         c === "#" ||
         c === "\t" ||
         c === ";" ||
-        c === "\r"
+        c === "\r" ||
+        c === '"'
       )
         break;
       pos++;
