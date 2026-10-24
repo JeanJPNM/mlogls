@@ -13,6 +13,8 @@ import { pathToFileURL } from "url";
 import { getDocumentDiagnostics } from "./lsp/diagnostics";
 import pc from "picocolors";
 
+declare const __VERSION__: string;
+
 // eslint-disable-next-line @typescript-eslint/no-floating-promises
 yargs(hideBin(process.argv))
   .command(
@@ -126,7 +128,7 @@ yargs(hideBin(process.argv))
       process.exit(hasErrors ? 1 : 0);
     }
   )
-  .version()
+  .version(__VERSION__)
   .help()
   .scriptName("mlogls")
   .parse();

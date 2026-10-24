@@ -1,5 +1,6 @@
 // @ts-check
 import * as esbuild from "esbuild";
+import pkg from "./package.json" with { type: "json" };
 
 const watchMode = process.argv.includes("--watch");
 const isDev = process.argv.includes("--dev");
@@ -28,6 +29,9 @@ const contexts = await Promise.all([
     format: "esm",
     banner: {
       js: "#!/usr/bin/env node",
+    },
+    define: {
+      __VERSION__: JSON.stringify(pkg.version),
     },
   }),
 ]);
