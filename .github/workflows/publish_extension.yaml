@@ -11,19 +11,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v3
         with:
-          node-version: "24.x"
-          cache: pnpm
-
-      - run: pnpm install --frozen-lockfile
+          runtime: node@24
+          cache: true
+          require-lockfile: true
       - name: Package vsix
         run: pnpm dlx @vscode/vsce package -o extension.vsix
         working-directory: packages/mlogls-vscode
       - name: Upload mlogls-vsix artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: mlogls-vsix
           path: packages/mlogls-vscode/extension.vsix
@@ -41,7 +39,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24.x"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: mlogls-vsix
       - name: Publish to VS Code Marketplace
@@ -60,7 +58,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24.x"
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: mlogls-vsix
       - name: Publish to Open VSX

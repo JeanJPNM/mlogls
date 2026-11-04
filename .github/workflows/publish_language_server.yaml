@@ -18,17 +18,14 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v5
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@v7
+      - uses: pnpm/setup@v3
         with:
-          node-version: "24.x"
-          registry-url: "https://registry.npmjs.org"
-          cache: pnpm
+          runtime: node@24
+          cache: true
+          require-lockfile: true
 
       - run: npm install -g npm@11
-      - run: pnpm install --frozen-lockfile
       - run: pnpm -C packages/mlogls build
-      - run: |
-          cd packages/mlogls
-          npm publish
+      - run: npm publish
+        working-directory: packages/mlogls

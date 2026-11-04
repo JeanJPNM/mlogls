@@ -23,25 +23,22 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v5
-      - name: Setup Node
-        uses: actions/setup-node@v6
+      - uses: pnpm/setup@v3
         with:
-          node-version: 24
-          cache: pnpm
+          runtime: node@24
+          cache: true
+          require-lockfile: true
       - name: Setup Pages
-        uses: actions/configure-pages@v4
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        uses: actions/configure-pages@v6
       - name: Build language server
         run: pnpm -C packages/mlogls build
       - name: Build VitePress site
         run: pnpm -C packages/site build
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: packages/site/.vitepress/dist
 
@@ -55,4 +52,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
