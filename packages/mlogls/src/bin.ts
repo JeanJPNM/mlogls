@@ -3,7 +3,7 @@ import {
   Diagnostic,
   DiagnosticSeverity,
   ProposedFeatures,
-} from "vscode-languageserver/node.js";
+} from "vscode-languageserver/node";
 import { startServer } from "./server";
 import yargs from "yargs";
 import { hideBin } from "yargs/helpers";
@@ -187,7 +187,9 @@ function formatDiagnostic(
     .substring(0, diagnostic.range.start.character)
     .replace(/[^\t]/g, " ");
 
-  console.log(`${location} - ${severity}${code}: ${diagnostic.message}`);
+  console.log(
+    `${location} - ${severity}${code}: ${diagnostic.message as string}`
+  );
   console.log(pc.gray(line));
   console.log(pc.gray(padding + marker + "\n"));
 }

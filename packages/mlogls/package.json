@@ -43,8 +43,8 @@
   ],
   "dependencies": {
     "picocolors": "^1.1.1",
-    "vscode-languageserver": "^9.0.1",
-    "vscode-languageserver-textdocument": "^1.0.15",
+    "vscode-languageserver": "^11.0.0",
+    "vscode-languageserver-textdocument": "^1.0.16",
     "yargs": "^18.2.0"
   },
   "type": "module",

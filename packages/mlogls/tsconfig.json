@@ -8,7 +8,8 @@
     "strict": true,
     "rootDir": "src",
     "outDir": "dist",
-    "declaration": true
+    "declaration": true,
+    "types": ["node"]
   },
   "include": ["src"],
   "exclude": ["node_modules", ".vscode-test"]

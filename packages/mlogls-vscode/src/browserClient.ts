@@ -31,7 +31,7 @@ export async function activate(context: ExtensionContext) {
     ],
   };
 
-  client = new LanguageClient("mlogls", "mlogls", clientOptions, worker);
+  client = new LanguageClient("mlogls", "mlogls", worker, clientOptions);
 
   await client.start();
   console.log("lsp-web-extension-sample server is ready");
