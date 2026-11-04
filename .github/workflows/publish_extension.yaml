@@ -7,7 +7,7 @@ on:
       - "mlogls-vscode-*"
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
 
     steps:
@@ -16,14 +16,52 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: "24.x"
-          registry-url: "https://registry.npmjs.org"
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build:all
-      - run: |
-          cd packages/mlogls-vscode
-          echo "Don't forget to renew the Azure token every year"
-          pnpm dlx vsce publish -p $VSCE_TOKEN
-        env:
-          VSCE_TOKEN: ${{ secrets.AZURE_PA_TOKEN }}
+      - name: Package vsix
+        run: pnpm dlx @vscode/vsce package -o extension.vsix
+        working-directory: packages/mlogls-vscode
+      - name: Upload mlogls-vsix artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mlogls-vsix
+          path: packages/mlogls-vscode/extension.vsix
+
+  publish-marketplace:
+    name: Publish to VS Code Marketplace
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: vscode-marketplace
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+      - uses: actions/download-artifact@v4
+        with:
+          name: mlogls-vsix
+      - name: Publish to VS Code Marketplace
+        run: npx @vscode/vsce publish --packagePath extension.vsix --oidc --skip-duplicate
+
+  publish-open-vsx:
+    name: Publish to Open VSX
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: open-vsx
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24.x"
+      - uses: actions/download-artifact@v4
+        with:
+          name: mlogls-vsix
+      - name: Publish to Open VSX
+        run: npx ovsx publish extension.vsix --trusted-publishing --skip-duplicate
