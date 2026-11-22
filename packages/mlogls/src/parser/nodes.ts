@@ -2542,6 +2542,7 @@ export class SetMarkerInstruction extends InstructionNode<
       outline: { id: {}, outlined: {} },
       rotation: { id: {}, angle: {} },
       shape: { id: {}, sides: {}, fill: {}, outline: {} },
+      arc: { id: {}, start: {}, end: {} },
       flushText: { id: {}, fetch: {} },
       fontSize: { id: {}, size: {} },
       textHeight: { id: {}, height: {} },
